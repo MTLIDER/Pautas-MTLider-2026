@@ -20,7 +20,7 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
 button,input,select,textarea{font-family:inherit}
 
 /* ── CONFIG SCREEN ─────────────────────────────────────────────── */
-#configScreen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:linear-gradient(135deg,#0d1f35,#0a3d62)}
+#configScreen{display:none!important;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:linear-gradient(135deg,#0d1f35,#0a3d62)}
 .config-card{background:#fff;border-radius:20px;padding:32px;width:100%;max-width:460px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
 .config-logo{display:flex;align-items:center;gap:10px;margin-bottom:24px}
 .logo-hex{width:42px;height:42px;background:linear-gradient(135deg,var(--teal),var(--green));border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#fff}
@@ -369,8 +369,8 @@ tr:hover td{background:#f9fafb}
     </div>
     <div class="config-title">Conectar con Supabase</div>
     <div class="config-desc">Ingresa las credenciales de tu proyecto Supabase para empezar. Solo se hace una vez — se guardan en el navegador.</div>
-    <div class="field"><label>URL del proyecto</label><input type="url" id="cfgUrl" placeholder="https://xmwtngobwcpfycgfcsvk.supabase.co"></div>
-    <div class="field"><label>Anon Key</label><input type="text" id="cfgKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhtd3RuZ29id2NwZnljZ2Zjc3ZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNDE0MTgsImV4cCI6MjA5MDcxNzQxOH0.gTrLdIwX0jhqVhDCrK8-GO9aXNL5d6f4cZND_dPSjHQ"></div>
+    <div class="field"><label>URL del proyecto</label><input type="url" id="cfgUrl" placeholder="https://xxxxxxxxxxxx.supabase.co"></div>
+    <div class="field"><label>Anon Key</label><input type="text" id="cfgKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."></div>
     <button class="btn-primary" id="btnConnect" onclick="conectar()">Conectar y continuar</button>
     <div class="config-hint">
       Encuentra estas credenciales en:<br>
@@ -715,9 +715,15 @@ function initSB() {
 // ================================================================
 // INIT
 // ================================================================
+// ── CREDENCIALES SUPABASE (hardcoded) ──────────────────────────
+const SB_URL  = 'https://xmwtngobwcpfycgfcsvk.supabase.co';
+const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhtd3RuZ29id2NwZnljZ2Zjc3ZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNDE0MTgsImV4cCI6MjA5MDcxNzQxOH0.gTrLdIwX0jhqVhDCrK8-GO9aXNL5d6f4cZND_dPSjHQ';
+
 window.addEventListener('DOMContentLoaded', () => {
-  if (initSB()) { showLogin(); }
-  else { document.getElementById('configScreen').style.display = 'flex'; }
+  // Inicializar Supabase directamente sin pantalla de configuracion
+  SB = window.supabase.createClient(SB_URL, SB_ANON);
+  document.getElementById('configScreen').style.display = 'none';
+  showLogin();
   document.getElementById('inpPass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 });
 

@@ -1527,247 +1527,103 @@ async function cargarDashboard() {
   renderDash(data, desde, hasta, vend);
 }
 
-function renderDash(kpi_data, rows, desde, hasta, vend) {
-  const sem=kpi_data.semaforo, st=Object.values(sem).reduce((a,b)=>a+b,0);
-  let sub=kpi_data.total.toLocaleString()+' contactos';
+function renderDash(d, desde, hasta, vend) {
+  if (!d) return;
+  const sem = d.semaforo||{BAJO:0,MEDIO:0,ALTO:0,VENTA:0,DESCARTADO:0};
+  const st  = Object.values(sem).reduce((a,b)=>a+b,0);
+  let sub = (d.total||0).toLocaleString()+' contactos';
   if(desde||hasta) sub+=' · '+(desde?fmtFecha(desde):'inicio')+' al '+(hasta?fmtFecha(hasta):'hoy');
+  if(vend) sub+=' · '+vend;
   document.getElementById('dashSub').textContent=sub;
+
+  // ── KPI CARDS ──────────────────────────────────────────────────
   document.getElementById('kpiGrid').innerHTML=[
-    kpi('Total Contactos',kpi_data.total.toLocaleString(),'Base de datos','var(--teal)'),
+    kpi('Total Contactos',(d.total||0).toLocaleString(),'Base de datos','var(--teal)'),
     kpi('Ventas Cerradas',sem.VENTA||0,'Semaforo VENTA','var(--purple)'),
-    kpi('Monto Total',fmtMonto(kpi_data.monto_total),'Suma de ventas','var(--green)'),
-    kpi('Recompradores',kpi_data.recompradores,'2+ compras','var(--amber)'),
+    kpi('Monto Total',fmtMonto(d.monto_total||0),'Suma de ventas','var(--green)'),
+    kpi('Recompradores',d.recompradores||0,'2+ compras','var(--amber)'),
     kpi('Conv. Rate',st>0?((sem.VENTA/st)*100).toFixed(2)+'%':'0%','Ventas/Total','#0ea5e9'),
   ].join('');
-  // Semaforo
-  const sdef=[['BAJO','🔵','var(--bajo,#3b82f6)'],['MEDIO','🟡','var(--amber)'],['ALTO','🟢','var(--green)'],['VENTA','🟣','var(--purple)'],['DESCARTADO','🔴','var(--red)']];
+
+  // ── SEMAFORO ───────────────────────────────────────────────────
+  const sdef=[['BAJO','🔵','#3b82f6'],['MEDIO','🟡','var(--amber)'],['ALTO','🟢','var(--green)'],['VENTA','🟣','var(--purple)'],['DESCARTADO','🔴','var(--red)']];
   document.getElementById('semGrid').innerHTML=sdef.map(([k,ico,col])=>`
     <div class="sem-card" style="border-top:3px solid ${col}">
       <div class="sem-count" style="color:${col}">${(sem[k]||0).toLocaleString()}</div>
       <div class="sem-label">${ico} ${k}</div>
       <div class="sem-pct">${st>0?((sem[k]||0)/st*100).toFixed(1):'0'}%</div>
     </div>`).join('');
-  // States
-  const estCount={};
-    const allEst=(d.topEstados||[]).map(e=>[e.estado,e.count]);
-  const top10=allEst.slice(0,10);
-  const maxE=top10[0]?.[1]||1;
+
+  // ── ESTADOS ────────────────────────────────────────────────────
+  const allEst = (d.topEstados||[]).map(e=>[e.estado, e.count]);
+  const top10  = allEst.slice(0,10);
+  const maxE   = top10[0]?.[1]||1;
   document.getElementById('estSub').textContent=`Mayor a menor (${allEst.length} estados)`;
-  document.getElementById('estBar').innerHTML=top10.map(([e,c])=>`
-    <div class="bar-item"><div class="bar-name" title="${e}">${e}</div>
-    <div class="bar-track"><div class="bar-fill" style="width:${c/maxE*100}%;background:var(--teal)"></div></div>
-    <div class="bar-val">${c}</div></div>`).join('');
+  document.getElementById('estBar').innerHTML = top10.length
+    ? top10.map(([e,cnt])=>`<div class="bar-item"><div class="bar-name" title="${e}">${e}</div><div class="bar-track"><div class="bar-fill" style="width:${cnt/maxE*100}%;background:var(--teal)"></div></div><div class="bar-val">${cnt}</div></div>`).join('')
+    : '<div style="padding:8px;font-size:12px;color:var(--gray)">Sin datos de estados</div>';
   document.getElementById('btnTodosEst').textContent=`Ver todos (${allEst.length})`;
   window._allEst=allEst;
-  // Heatmap horario — ya calculado en servidor como objeto {"0":55,"1":23,...}
-  const horaObj = d.horaCount || {};
+
+  // ── HEATMAP HORARIO ────────────────────────────────────────────
+  const horaObj   = d.horaCount||{};
   const horaCount = Array(24).fill(0).map((_,h)=>parseInt(horaObj[String(h)])||0);
-  const maxH = Math.max(...horaCount, 1);
-  document.getElementById('heatGrid').innerHTML=horaCount.map((v,h)=>{
+  const maxH      = Math.max(...horaCount,1);
+  document.getElementById('heatGrid').innerHTML = horaCount.map((v,h)=>{
     const {bg,tc}=heatColor(v,maxH);
-    const hr12=h%12||12,ap=h<12?'a':'p';
-    return `<div class="hc" style="background:${bg};color:${tc};border:1px solid rgba(0,0,0,.06)" title="${h}:00 → ${v}">
-      <div style="font-size:6.5px;opacity:.8">${hr12}${ap}</div><div style="font-size:8.5px;font-weight:800">${v||''}</div></div>`;
+    const hr12=h%12||12, ap=h<12?'a':'p';
+    return `<div class="hc" style="background:${bg};color:${tc};border:1px solid rgba(0,0,0,.05)" title="${h}:00 → ${v}">
+      <div style="font-size:6.5px;opacity:.8">${hr12}${ap}</div>
+      <div style="font-size:8.5px;font-weight:800">${v||''}</div></div>`;
   }).join('');
-  // Dia de semana — ya calculado en servidor {"0":45,"1":120,...} (0=Dom...6=Sab)
-  const dowObj = d.diasSemana || {};
+
+  // ── DIA DE SEMANA ──────────────────────────────────────────────
+  const dowObj   = d.diasSemana||{};
   const dowCount = Array(7).fill(0).map((_,i)=>parseInt(dowObj[String(i)])||0);
-  const maxD=Math.max(...dowCount,1);
-  const dowLabels=['D','L','M','Ms','J','V','S'],dowColors=['#ef4444','#00a0e9','#00a0e9','#00a0e9','#00a0e9','#00a0e9','#3b82f6'];
-  document.getElementById('dowGrid').innerHTML=dowCount.map((v,i)=>`
+  const maxD     = Math.max(...dowCount,1);
+  const DIAS     = ['D','L','M','Ms','J','V','S'];
+  const dowC     = ['#ef4444','#00a0e9','#00a0e9','#00a0e9','#00a0e9','#00a0e9','#3b82f6'];
+  document.getElementById('dowGrid').innerHTML = dowCount.map((v,i)=>`
     <div class="dow-wrap">
       <div class="dow-cnt">${v}</div>
-      <div class="dow-track"><div class="dow-fill" style="height:${Math.max(4,Math.round(v/maxD*66))}px;background:${dowColors[i]};opacity:${.5+.5*v/maxD}"></div></div>
-      <div class="dow-lbl" style="color:${dowColors[i]}">${dowLabels[i]}</div>
+      <div class="dow-track"><div class="dow-fill" style="height:${Math.max(4,Math.round(v/maxD*66))}px;background:${dowC[i]};opacity:${.5+.5*v/maxD}"></div></div>
+      <div class="dow-lbl" style="color:${dowC[i]}">${DIAS[i]}</div>
     </div>`).join('');
-  // Tendencia — ya viene del servidor como array de {fecha, full, count}
-  const DIAS=['D','L','M','Ms','J','V','S'],dowC=['#ef4444','#00a0e9','#00a0e9','#00a0e9','#00a0e9','#00a0e9','#3b82f6'];
-  let tend = (d.tendencia||[]);  // tend items: {fecha:'MM-DD', full:'YYYY-MM-DD', count:N}
-  const maxS=Math.max(...tend.map(t=>t.count),1);
-  document.getElementById('sparkWrap').innerHTML=`<div style="display:flex;align-items:flex-end;gap:3px;width:100%;height:100px">`+
-    tend.map((t,i)=>{
-      const h=Math.max(4,Math.round(t.count/maxS*72));
-      const _dt=new Date((t.full||('2026-'+t.fecha))+'T00:00:00'), dow=_dt.getDay();
-      const showF=i===0||i===tend.length-1||i%5===0;
-      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100px">
-        <div style="font-size:8px;font-weight:800;color:var(--teal);margin-bottom:2px;min-height:12px">${t.count||''}</div>
-        <div style="width:100%;height:${h}px;background:var(--teal);border-radius:2px 2px 0 0;opacity:${.4+.6*t.count/maxS}" title="${t.fecha}: ${t.count}"></div>
-        <div style="font-size:8px;font-weight:700;color:${dowC[dow]};margin-top:3px">${DIAS[dow]}</div>
-        <div style="font-size:7px;color:var(--gray);text-align:center">${showF?t.fecha:''}</div>
-      </div>`;
-    }).join('')+'</div>';
-  // byVend ya viene del servidor en d.byVend
+
+  // ── TENDENCIA ──────────────────────────────────────────────────
+  const tend   = d.tendencia||[];
+  const maxS   = Math.max(...tend.map(t=>t.count),1);
+  document.getElementById('sparkWrap').innerHTML = tend.length
+    ? `<div style="display:flex;align-items:flex-end;gap:3px;width:100%;height:100px">` +
+      tend.map((t,i)=>{
+        const h    = Math.max(4,Math.round(t.count/maxS*72));
+        const _dt  = new Date((t.full||'2026-'+t.fecha)+'T00:00:00');
+        const dow  = _dt.getDay();
+        const showF= i===0||i===tend.length-1||i%5===0;
+        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100px">
+          <div style="font-size:8px;font-weight:800;color:var(--teal);margin-bottom:2px;min-height:12px">${t.count||''}</div>
+          <div style="width:100%;height:${h}px;background:var(--teal);border-radius:2px 2px 0 0;opacity:${.4+.6*t.count/maxS}" title="${t.fecha}: ${t.count}"></div>
+          <div style="font-size:8px;font-weight:700;color:${dowC[dow]};margin-top:3px">${DIAS[dow]}</div>
+          <div style="font-size:7px;color:var(--gray);text-align:center">${showF?t.fecha:''}</div>
+        </div>`;
+      }).join('') + '</div>'
+    : '<div style="padding:16px;font-size:12px;color:var(--gray);text-align:center">Cargando tendencia...</div>';
+
+  // ── VENDEDORAS ─────────────────────────────────────────────────
   const vcols=['var(--teal)','var(--green)','var(--amber)','var(--purple)','var(--red)'];
-  document.getElementById('vendGrid').innerHTML=(d.byVend||[]).map((v,i)=>`
+  document.getElementById('vendGrid').innerHTML = (d.byVend||[]).map((v,i)=>`
     <div class="card" style="margin:0;border-top:4px solid ${vcols[i%vcols.length]}">
       <div style="font-size:14px;font-weight:700;color:${vcols[i%vcols.length]};margin-bottom:8px">${v.nombre||v.key}</div>
-      <div class="bar-item" style="margin-bottom:5px"><div class="bar-name">Contactos</div><div class="bar-val" style="color:var(--dark);font-size:14px">${v.total}</div></div>
-      <div class="bar-item"><div class="bar-name">Ventas</div><div class="bar-val" style="color:var(--purple);font-size:14px">${v.ventas}</div></div>
+      <div class="bar-item" style="margin-bottom:5px"><div class="bar-name">Contactos</div><div class="bar-val" style="color:var(--dark);font-size:14px">${v.total||0}</div></div>
+      <div class="bar-item"><div class="bar-name">Ventas</div><div class="bar-val" style="color:var(--purple);font-size:14px">${v.ventas||0}</div></div>
     </div>`).join('');
-  // Mexico map — allEst already computed from server data above
+
+  // ── MAPA MEXICO ────────────────────────────────────────────────
   renderMexicoMap(allEst);
-  // Compliance KPIs
+  // ── CUMPLIMIENTO ───────────────────────────────────────────────
   cargarCumplimiento();
 }
 
-// ================================================================
-// CUMPLIMIENTO DE TAREAS
-// ================================================================
-let _complianceData = null;
-
-async function cargarCumplimiento() {
-  document.getElementById('complianceGrid').innerHTML = '<div class="loading"><div class="sp"></div></div>';
-  document.getElementById('complianceKpis').innerHTML = '';
-  const desde = document.getElementById('dashDesde')?.value||null;
-  const hasta = document.getElementById('dashHasta')?.value||null;
-  const vend  = document.getElementById('dashVend')?.value||null;
-  const {data, error} = await SB.rpc('get_compliance_kpis', {
-    p_desde: desde||null, p_hasta: hasta||null, p_vend: vend||null
-  });
-  if (error) { document.getElementById('complianceGrid').innerHTML=`<div class="loading">Error: ${error.message}</div>`; return; }
-  _complianceData = data;
-  renderCumplimiento(data);
-}
-
-function renderCumplimiento(data) {
-  if (!data) return;
-  const pct = parseFloat(data.pct_global)||0;
-  const pctCls = pct>=80?'kpi-compliance':pct>=50?'kpi-warning':'kpi-danger';
-  const pctColor = pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--red)';
-
-  // KPI cards globales
-  document.getElementById('complianceKpis').innerHTML = `
-    <div class="kpi-card ${pctCls}" style="--kc:${pctColor}">
-      <div class="kpi-label">Cumplimiento Global</div>
-      <div class="kpi-value" style="color:${pctColor}">${pct}%</div>
-      <div class="kpi-sub">${data.hechas||0} de ${data.total_tareas||0} tareas</div>
-    </div>
-    <div class="kpi-card kpi-danger" style="--kc:var(--red)">
-      <div class="kpi-label">Tareas Vencidas</div>
-      <div class="kpi-value" style="color:var(--red)">${data.vencidas||0}</div>
-      <div class="kpi-sub">Sin completar, fecha pasada</div>
-    </div>
-    <div class="kpi-card" style="--kc:var(--amber)">
-      <div class="kpi-label">Pendientes Hoy</div>
-      <div class="kpi-value" style="color:var(--amber)">${data.pendientes_hoy||0}</div>
-      <div class="kpi-sub">Deberian completarse hoy</div>
-    </div>
-    <div class="kpi-card ${data.rafagas>0?'kpi-warning':''}" style="--kc:var(--orange,#f97316)">
-      <div class="kpi-label">Alertas Prisa</div>
-      <div class="kpi-value" style="color:#c2410c">${data.rafagas||0}</div>
-      <div class="kpi-sub">3+ tareas en menos de 20 min</div>
-    </div>`;
-
-  // Cards por asesora
-  const asesoras = data.por_asesora || [];
-  if (!asesoras.length) {
-    document.getElementById('complianceGrid').innerHTML = '<div style="padding:16px;font-size:12px;color:var(--gray);text-align:center">Sin datos de tareas completadas aun. Las metricas apareceran conforme las asesoras completen tareas en el pipeline.</div>';
-    return;
-  }
-
-  document.getElementById('complianceGrid').innerHTML = `<div class="compliance-grid">${asesoras.map(a => {
-    const pct = parseFloat(a.pct)||0;
-    const col = pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--red)';
-    const circ = 126 - (pct/100*126); // stroke-dashoffset
-    const hora = parseInt(a.hora_pico)||0;
-    const hr12 = hora%12||12, ap = hora<12?'am':'pm';
-    const adelanto = parseFloat(a.adelanto_prom)||0;
-    const adelantoCls = adelanto>0?'early':adelanto===0?'on-time':'late';
-    const adelantoTxt = adelanto>0?`+${adelanto}d adelanto`:adelanto===0?'a tiempo':`${adelanto}d tarde`;
-    return `
-      <div class="asesor-card">
-        <!-- Circulo porcentaje -->
-        <div class="pct-circle">
-          <svg width="52" height="52" viewBox="0 0 52 52">
-            <circle cx="26" cy="26" r="20" fill="none" stroke="var(--ltgray)" stroke-width="4"/>
-            <circle cx="26" cy="26" r="20" fill="none" stroke="${col}" stroke-width="4"
-              stroke-dasharray="126" stroke-dashoffset="${circ}"
-              stroke-linecap="round" class="progress-ring"/>
-          </svg>
-          <div class="pct-value" style="color:${col}">${pct}%</div>
-        </div>
-        <div class="asesor-header">
-          <div class="asesor-avatar" style="background:${getVendColor(a.asesora)}">${(a.asesora||'?').charAt(0).toUpperCase()}</div>
-          <div>
-            <div class="asesor-name">${getVendNombre(a.asesora)}</div>
-            <div class="asesor-rol">@${a.asesora}</div>
-          </div>
-        </div>
-        <div class="metric-row"><span class="metric-lbl">Tareas completadas</span><span class="metric-val">${a.hechas||0} / ${a.total||0}</span></div>
-        <div class="metric-row"><span class="metric-lbl">Vencidas</span><span class="metric-val" style="color:${(a.vencidas||0)>0?'var(--red)':'var(--green)'}">${a.vencidas||0}</span></div>
-        <div class="metric-row"><span class="metric-lbl">Pendientes esta semana</span><span class="metric-val" style="color:var(--amber)">${a.semana||0}</span></div>
-        <div class="metric-row">
-          <span class="metric-lbl">Cumplimiento de tiempos</span>
-          <span class="adelanto-pill ${adelantoCls}">${adelantoTxt}</span>
-        </div>
-        <div class="metric-row"><span class="metric-lbl">Hora pico de actividad</span><span class="metric-val">⏰ ${hr12}${ap}</span></div>
-        ${(a.rafagas||0)>0?`<div class="metric-row"><span class="metric-lbl">Alertas prisa</span><span class="alert-badge">⚡ ${a.rafagas} rafagas detectadas</span></div>`:''}
-        <!-- Mini heatmap de horas -->
-        <div style="margin-top:10px">
-          <div style="font-size:10px;color:var(--gray);margin-bottom:4px">Actividad por hora</div>
-          <div class="hora-mini-grid" id="horasMini-${a.asesora}"></div>
-          <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--gray);margin-top:2px"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>11p</span></div>
-        </div>
-      </div>`;
-  }).join('')}</div>`;
-
-  // Render mini heatmaps
-  asesoras.forEach(a => {
-    renderMiniHeatmap(`horasMini-${a.asesora}`, data.heatmap_horas||{});
-  });
-
-  // Render heatmap principal de actividad
-  renderActividadHeatmap(data.heatmap_horas||{});
-}
-
-function renderMiniHeatmap(elId, horasData) {
-  const el = document.getElementById(elId);
-  if (!el) return;
-  const maxH = Math.max(...Object.values(horasData).map(Number), 1);
-  el.innerHTML = Array(24).fill(0).map((_, h) => {
-    const v = parseInt(horasData[String(h)])||0;
-    const {bg} = heatColor(v, maxH);
-    return `<div class="hora-mini" style="background:${bg}" title="${h}:00 → ${v} tareas"></div>`;
-  }).join('');
-}
-
-function renderActividadHeatmap(horasData) {
-  const el = document.getElementById('actividadHeatGrid');
-  if (!el) return;
-  const maxH = Math.max(...Object.values(horasData).map(Number), 1);
-  el.innerHTML = Array(24).fill(0).map((_, h) => {
-    const v = parseInt(horasData[String(h)])||0;
-    const {bg,tc} = heatColor(v, maxH);
-    const hr12 = h%12||12, ap = h<12?'a':'p';
-    return `<div class="hc" style="background:${bg};color:${tc};border:1px solid rgba(0,0,0,.05)" title="${h}:00 → ${v} tareas completadas">
-      <div style="font-size:6.5px;opacity:.8">${hr12}${ap}</div>
-      <div style="font-size:8.5px;font-weight:800">${v||''}</div>
-    </div>`;
-  }).join('');
-
-  // Legend
-  const lgEl = document.getElementById('complianceLegend');
-  if (lgEl) {
-    const peak = Object.entries(horasData).sort((a,b)=>Number(b[1])-Number(a[1])).slice(0,3);
-    lgEl.innerHTML = peak.map(([h,v]) => {
-      const hr12=parseInt(h)%12||12, ap=parseInt(h)<12?'am':'pm';
-      return `<div style="display:flex;align-items:center;gap:5px">
-        <div style="width:10px;height:10px;border-radius:2px;background:var(--teal);opacity:.8"></div>
-        <span>Pico: <b>${hr12}${ap}</b> (${v} tareas)</span>
-      </div>`;
-    }).join('');
-  }
-}
-
-// Helpers para colores y nombres de vendedoras
-function getVendColor(usr) {
-  const v = vendedoras.find(v=>v.usuario===usr);
-  return v?.color || '#6b7280';
-}
-function getVendNombre(usr) {
-  const v = vendedoras.find(v=>v.usuario===usr);
-  return v?.nombre || usr;
-}
 
 function toggleEstados() {
   const w=document.getElementById('estAllWrap');

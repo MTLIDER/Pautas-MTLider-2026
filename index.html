@@ -566,6 +566,12 @@ tr:hover td{background:#f9fafb}
       <select class="f-sel" id="filtVend"><option value="">Todas las asesoras</option></select>
       <select class="f-sel" id="filtSem"><option value="">Todos los semaforos</option><option value="BAJO">Bajo</option><option value="MEDIO">Medio</option><option value="ALTO">Alto</option><option value="VENTA">Venta</option><option value="DESCARTADO">Descartado</option></select>
       <select class="f-sel" id="filtEtapa"><option value="">Todas las etapas</option><option value="1">Etapa 1</option><option value="2">Etapa 2</option><option value="3">Etapa 3</option><option value="4">Etapa 4</option></select>
+    </div>
+    <div class="search-row" style="margin-top:-6px">
+      <label style="font-size:11px;font-weight:700;color:var(--gray);align-self:center">Desde</label>
+      <input type="date" id="filtDesde" class="f-sel" style="padding:7px 9px">
+      <label style="font-size:11px;font-weight:700;color:var(--gray);align-self:center">Hasta</label>
+      <input type="date" id="filtHasta" class="f-sel" style="padding:7px 9px">
       <button class="btn-sm primary" onclick="cargarTodos(1)">Filtrar</button>
       <button class="btn-sm" onclick="limpiarFiltros()">Limpiar</button>
     </div>
@@ -1132,12 +1138,16 @@ async function cargarTodos(page=1) {
   const sem   = document.getElementById('filtSem')?.value;
   const etapa = document.getElementById('filtEtapa')?.value;
   const from  = (page-1)*PAGE_SIZE, to=from+PAGE_SIZE-1;
+  const filtDesde = document.getElementById('filtDesde')?.value;
+  const filtHasta = document.getElementById('filtHasta')?.value;
   let qry = SB.from('contactos').select('*',{count:'exact'})
-    .order('fecha','descending').order('created_at','descending').range(from,to);
-  if (vend)  qry = qry.eq('vendedora', vend);
-  if (sem)   qry = qry.eq('semaforo', sem);
-  if (etapa) qry = qry.eq('etapa_actual', parseInt(etapa));
-  if (q)     qry = qry.or(`numero.ilike.%${q}%,nombre.ilike.%${q}%,estado.ilike.%${q}%,notas.ilike.%${q}%`);
+    .order('fecha',{ascending:false}).order('created_at',{ascending:false}).range(from,to);
+  if (vend)      qry = qry.eq('vendedora', vend);
+  if (sem)       qry = qry.eq('semaforo', sem);
+  if (etapa)     qry = qry.eq('etapa_actual', parseInt(etapa));
+  if (filtDesde) qry = qry.gte('fecha', filtDesde);
+  if (filtHasta) qry = qry.lte('fecha', filtHasta);
+  if (q)         qry = qry.or(`numero.ilike.%${q}%,nombre.ilike.%${q}%,estado.ilike.%${q}%,notas.ilike.%${q}%`);
   const { data, count, error } = await qry;
   if (error) { document.getElementById('todosContent').innerHTML=`<div class="loading">Error: ${error.message}</div>`; return; }
   document.getElementById('todosSubTitle').textContent = `${count||0} registros totales · pagina ${page}`;
@@ -1147,7 +1157,7 @@ async function cargarTodos(page=1) {
 
 function limpiarFiltros() {
   ['filtVend','filtSem','filtEtapa'].forEach(id=>{const e=document.getElementById(id);if(e)e.selectedIndex=0;});
-  const s=document.getElementById('searchTodos');if(s)s.value='';
+  ['searchTodos','filtDesde','filtHasta'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   cargarTodos(1);
 }
 

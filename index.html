@@ -1872,3 +1872,60 @@ function renderMexicoMap(allEst) {
   }
   tryNext(URLS);
 }
+
+
+
+
+
+// ================================================================
+// TODOS LOS ESTADOS TOGGLE
+// ================================================================
+var _todosEstados = [];
+function renderTodosEstados(estados) {
+  _todosEstados = estados || [];
+}
+function toggleTodosEstados() {
+  var wrap = document.getElementById('estAllWrap');
+  var btn  = document.getElementById('btnTodosEst');
+  if (!wrap) return;
+  var isOpen = wrap.classList.contains('visible');
+  if (!isOpen) {
+    var maxE = _todosEstados[0]?.count || 1;
+    document.getElementById('estBarAll').innerHTML = _todosEstados.map(function(e,i) {
+      return '<div class="bar-item" style="opacity:' + (i<10?1:0.85) + '">' +
+        '<div class="bar-name" title="' + e.estado + '" style="font-size:10px">' + (i+1)+'. '+e.estado + '</div>' +
+        '<div class="bar-track"><div class="bar-fill" style="width:' + (e.count/maxE*100) + '%;background:var(--teal)"></div></div>' +
+        '<div class="bar-val">' + e.count + '</div></div>';
+    }).join('');
+    wrap.classList.add('visible');
+    btn.textContent = 'Ocultar lista completa';
+  } else {
+    wrap.classList.remove('visible');
+    btn.textContent = 'Ver todos los estados (' + _todosEstados.length + ')';
+  }
+}
+
+function confirmarEliminar(){
+  if(!editingId) return;
+  if(!confirm('⚠️ ¿Eliminar el registro '+editingId+'?\n\nEsta acción no se puede deshacer.')) return;
+  const btn=document.getElementById('btnDelete');
+  btn.disabled=true; btn.textContent='Eliminando...';
+  google.script.run
+    .withSuccessHandler(r=>{
+      btn.disabled=false; btn.textContent='🗑 Eliminar';
+      if(r.ok){
+        cerrarModal('edit');
+        showToast('🗑 Registro '+editingId+' eliminado.','ok');
+        if(document.getElementById('panel-todos')?.classList.contains('active')) cargarTodos();
+        if(document.getElementById('panel-misregistros')?.classList.contains('active')) cargarMisRegistros();
+      } else showToast('Error: '+r.msg,'err');
+    })
+    .withFailureHandler(e=>{btn.disabled=false;btn.textContent='🗑 Eliminar';showToast('Error: '+e.message,'err');})
+    .eliminarRegistro(editingId);
+}
+
+function showToast(msg,type){const t=document.createElement('div');t.className='toast '+(type==='ok'?'ok':type==='info'?'info':'err');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3500);}
+
+</script>
+</body>
+</html>

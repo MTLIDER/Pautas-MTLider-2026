@@ -356,6 +356,51 @@ tr:hover td{background:#f9fafb}
 .on-time{background:#d1fae5;color:#065f46}
 .late{background:#fee2e2;color:#991b1b}
 .early{background:#dbeafe;color:#1d4ed8}
+
+/* ── CAMPANAS ─────────────────────────────────────────────── */
+.campana-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:50px;font-size:10px;font-weight:700;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;animation:pulse-badge 2s infinite}
+@keyframes pulse-badge{0%,100%{opacity:1}50%{opacity:.7}}
+.campana-hoy{background:#fef9c3;border:2px solid #fde047;border-radius:var(--r);padding:14px;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.campana-hoy-icon{font-size:24px;flex-shrink:0}
+.campana-hoy-info{flex:1}
+.campana-hoy-title{font-size:13px;font-weight:700;color:#713f12}
+.campana-hoy-sub{font-size:11px;color:#854d0e;margin-top:2px}
+.campana-row{border-left:4px solid #f97316!important;background:#fff7ed!important}
+.campana-row:hover td{background:#fef3c7!important}
+.agenda-calendar{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:12px}
+.agenda-day-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;cursor:pointer;transition:.15s}
+.agenda-day-card:hover{border-color:var(--teal);background:#f0f9ff}
+.agenda-day-card.hoy{border-color:#f97316;background:#fff7ed}
+.agenda-day-card.pasado{opacity:.5}
+.agenda-day-card.futuro{background:#f8fafc}
+.agenda-day-date{font-size:11px;font-weight:700;color:var(--dark)}
+.agenda-day-count{font-size:20px;font-weight:800;color:var(--teal);margin:4px 0}
+.agenda-day-card.hoy .agenda-day-count{color:#f97316}
+.agenda-day-label{font-size:9px;color:var(--gray)}
+.campana-form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.campana-form{grid-template-columns:1fr}}
+
+/* ── PIPELINE TEMPLATES ────────────────────────────────────── */
+.template-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:50px;font-size:10px;font-weight:700}
+.tpl-estandar{background:#dbeafe;color:#1d4ed8}
+.tpl-reactivacion{background:#fff7ed;color:#c2410c}
+.tpl-caliente{background:#fee2e2;color:#991b1b;animation:pulse-hot 1.5s infinite}
+.tpl-postventa{background:#ede9fe;color:#5b21b6}
+@keyframes pulse-hot{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.4)}70%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}
+.promover-menu{background:#fff;border:1px solid var(--border);border-radius:10px;padding:6px;box-shadow:0 4px 16px rgba(0,0,0,.12);position:absolute;z-index:50;min-width:220px;display:none}
+.promover-menu.open{display:block}
+.promover-opt{padding:8px 12px;border-radius:7px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:8px;transition:.15s}
+.promover-opt:hover{background:var(--bg)}
+.estado-btn{padding:4px 10px;border-radius:6px;border:1px solid var(--border);font-size:10px;font-weight:700;cursor:pointer;transition:.15s;background:#fff}
+.estado-sin{color:#6b7280;border-color:#e5e7eb}.estado-sin:hover{background:#f9fafb}
+.estado-resp{color:#0080c0;border-color:#bfdbfe}.estado-resp:hover{background:#dbeafe}
+.estado-int{color:#d97706;border-color:#fde68a}.estado-int:hover{background:#fef3c7}
+.estado-venta{color:#5b21b6;border-color:#ddd6fe}.estado-venta:hover{background:#ede9fe}
+.estado-inac{color:#991b1b;border-color:#fee2e2}.estado-inac:hover{background:#fee2e2}
+.campana-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:14px}
+.campana-kpi{background:#fff;border-radius:10px;border:1px solid var(--border);padding:12px;text-align:center}
+.campana-kpi-val{font-size:22px;font-weight:800}
+.campana-kpi-lbl{font-size:10px;color:var(--gray);margin-top:3px}
 </style>
 </head>
 <body>
@@ -567,6 +612,72 @@ tr:hover td{background:#f9fafb}
   </div>
 </div>
 
+  <!-- CAMPANAS -->
+  <div class="tab-panel" id="panel-campanas">
+    <div class="sec-title">Campanas de Reactivacion</div>
+    <div class="sec-sub">Retoma contactos historicos de forma escalonada — un dia a la vez</div>
+
+    <!-- Alerta de HOY -->
+    <div id="campanaHoyWrap"></div>
+
+    <!-- Tabs campana -->
+    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap" id="campanaTabs">
+      <button class="preset-btn active" onclick="switchCampanaTab('hoy',this)">📅 Hoy</button>
+      <button class="preset-btn" onclick="switchCampanaTab('agenda',this)">🗓 Agenda</button>
+      <button class="preset-btn" onclick="switchCampanaTab('crear',this)">➕ Nueva campana</button>
+    </div>
+
+    <!-- HOY -->
+    <div id="campanaTabHoy">
+      <div id="campanaHoyContent"><div class="loading"><div class="sp"></div></div></div>
+    </div>
+
+    <!-- AGENDA -->
+    <div id="campanaTabAgenda" style="display:none">
+      <div class="card">
+        <div class="card-title">Calendario de activaciones</div>
+        <div class="card-sub">Cuantos contactos se activan cada dia</div>
+        <div class="agenda-calendar" id="agendaCalendar"></div>
+      </div>
+    </div>
+
+    <!-- CREAR NUEVA CAMPANA -->
+    <div id="campanaTabCrear" style="display:none">
+      <div class="card">
+        <div class="card-title">Crear campana de reactivacion</div>
+        <div class="card-sub">Define el rango de contactos y la fecha de inicio</div>
+        <div class="campana-form" style="margin-top:14px">
+          <div class="field full"><label>Nombre de la campana *</label><input type="text" id="cnNombre" placeholder="ej. Reactivacion Diciembre 2025"></div>
+          <div class="field full"><label>Descripcion</label><input type="text" id="cnDesc" placeholder="ej. Retomar prospectos de diciembre que no compraron"></div>
+          <div class="field"><label>Fecha de inicio de la campana *</label><input type="date" id="cnInicio"><div style="font-size:10px;color:var(--gray);margin-top:4px">Desde que dia empezar a activar contactos</div></div>
+          <div class="field"><label>Pipeline de reactivacion</label>
+            <select id="cnTemplate" style="padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;width:100%">
+              <option value="2">🟠 Reactivacion — 2 etapas, proceso rapido</option>
+              <option value="1">🔵 Estandar — 4 etapas completas</option>
+            </select>
+            <div style="font-size:10px;color:var(--gray);margin-top:4px">El pipeline de reactivacion es mas corto — si el cliente muestra interes, se puede promover a cualquier otro pipeline</div>
+          </div>
+          <div class="field"><label>Semaforos a incluir</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+              <label style="display:flex;align-items:center;gap:5px;font-size:12px"><input type="checkbox" id="cnBajo" checked> 🔵 Bajo</label>
+              <label style="display:flex;align-items:center;gap:5px;font-size:12px"><input type="checkbox" id="cnMedio" checked> 🟡 Medio</label>
+              <label style="display:flex;align-items:center;gap:5px;font-size:12px"><input type="checkbox" id="cnAlto"> 🟢 Alto</label>
+            </div>
+          </div>
+          <div class="field"><label>Contactos desde (fecha original) *</label><input type="date" id="cnDesde" value="2025-12-01"></div>
+          <div class="field"><label>Contactos hasta (fecha original) *</label><input type="date" id="cnHasta" value="2025-12-31"></div>
+        </div>
+        <div style="background:#f0f9ff;border-radius:9px;padding:12px;margin-top:14px;font-size:12px;color:var(--dark)" id="cnPreview">
+          Selecciona las fechas para ver una previsualizacion de la campana.
+        </div>
+        <div style="margin-top:14px;display:flex;gap:10px">
+          <button class="btn-sm primary" onclick="crearCampana()">Crear campana</button>
+          <button class="btn-sm" onclick="previewCampana()">Previsualizar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 <!-- MODAL: Detalle / Editar contacto + Pipeline -->
 <div class="modal-ov" id="contactoModal">
   <div class="modal">
@@ -777,7 +888,7 @@ async function initApp() {
   const isMkt   = SESSION.rol === 'MARKETING';
 
   const tabs = isAdmin
-    ? [{id:'dashboard',l:'📊 Dashboard'},{id:'todos',l:'📋 Registros'},{id:'recompras',l:'🔁 Recompras'},{id:'registrar',l:'➕ Registrar'},{id:'asesoras',l:'👥 Asesoras'},{id:'listas',l:'⚙️ Listas'}]
+    ? [{id:'dashboard',l:'📊 Dashboard'},{id:'todos',l:'📋 Registros'},{id:'recompras',l:'🔁 Recompras'},{id:'registrar',l:'➕ Registrar'},{id:'asesoras',l:'👥 Asesoras'},{id:'listas',l:'⚙️ Listas'},{id:'campanas',l:'📣 Campanas'}]
     : isMkt
     ? [{id:'dashboard',l:'📊 Dashboard'}]
     : [{id:'registrar',l:'➕ Registrar'},{id:'misregistros',l:'📋 Mis Registros'}];
@@ -2030,6 +2141,237 @@ function cerrarModal(which){
 function kpi(label,value,sub,color){
   return`<div class="kpi-card" style="--kc:${color}"><div class="kpi-label">${label}</div><div class="kpi-value" style="color:${color}">${value}</div><div class="kpi-sub">${sub}</div></div>`;
 }
+// ================================================================
+// CAMPANAS DE REACTIVACION
+// ================================================================
+let _campanaActiva = null;
+let _campanaTab = 'hoy';
+
+async function cargarCampanas() {
+  // Cargar campana activa
+  const { data } = await SB.from('campanas').select('*').eq('activa', true).order('created_at', {ascending: false}).limit(1);
+  _campanaActiva = data?.[0] || null;
+  if (!_campanaActiva) {
+    document.getElementById('campanaHoyContent').innerHTML = `
+      <div style="text-align:center;padding:32px;color:var(--gray)">
+        <div style="font-size:40px;margin-bottom:10px">📣</div>
+        <div style="font-size:14px;font-weight:700;margin-bottom:6px">Sin campanas activas</div>
+        <div style="font-size:12px">Crea una campana en la pestana "Nueva campana"</div>
+      </div>`;
+    return;
+  }
+  cargarHoyCampana();
+  actualizarAlertaHoy();
+}
+
+async function actualizarAlertaHoy() {
+  if (!_campanaActiva) return;
+  const { count } = await SB.from('campana_contactos')
+    .select('*', {count: 'exact', head: true})
+    .eq('campana_id', _campanaActiva.id)
+    .eq('fecha_activacion', new Date().toISOString().split('T')[0])
+    .eq('estado', 'pendiente');
+  const wrap = document.getElementById('campanaHoyWrap');
+  if (count > 0) {
+    wrap.innerHTML = `<div class="campana-hoy">
+      <div class="campana-hoy-icon">🔔</div>
+      <div class="campana-hoy-info">
+        <div class="campana-hoy-title">${_campanaActiva.nombre} — Hoy tienes ${count} contactos para reactivar</div>
+        <div class="campana-hoy-sub">Estos clientes fueron registrados originalmente en la fecha equivalente de la campana. Es momento de contactarlos.</div>
+      </div>
+      <button class="btn-sm primary" onclick="switchTab('campanas')">Ver ahora</button>
+    </div>`;
+  } else {
+    wrap.innerHTML = '';
+  }
+}
+
+async function cargarHoyCampana() {
+  if (!_campanaActiva) return;
+  const el = document.getElementById('campanaHoyContent');
+  el.innerHTML = '<div class="loading"><div class="sp"></div></div>';
+  const hoy = new Date().toISOString().split('T')[0];
+  const { data } = await SB.from('campana_contactos')
+    .select('*, contactos(id,numero,nombre,estado,semaforo,vendedora,fecha,etapa_actual)')
+    .eq('campana_id', _campanaActiva.id)
+    .eq('fecha_activacion', hoy)
+    .order('fecha_activacion');
+
+  // Load campaign summary
+  const { data: resumen } = await SB.from('campana_resumen').select('*').eq('campana_id', _campanaActiva.id).single();
+  const kpis = resumen || {};
+
+  if (!data || !data.length) {
+    el.innerHTML = `
+      <div class="campana-kpi-grid">${renderCampanaKpis(kpis)}</div>
+      <div class="card" style="text-align:center;padding:24px;color:var(--gray)">
+        <div style="font-size:28px;margin-bottom:8px">✅</div>
+        <div style="font-weight:700">Sin contactos para reactivar hoy</div>
+        <div style="font-size:12px;margin-top:4px">Los proximos contactos se activaran en los proximos dias</div>
+      </div>`;
+    return;
+  }
+
+  // Group by vendedora
+  const byVend = {};
+  data.forEach(cc => {
+    const v = cc.contactos?.vendedora || 'sin asignar';
+    if (!byVend[v]) byVend[v] = [];
+    byVend[v].push(cc);
+  });
+
+  el.innerHTML = `<div class="campana-kpi-grid">${renderCampanaKpis(kpis)}</div>` +
+    Object.entries(byVend).map(([vend, items]) => `
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div>
+          <div class="card-title">${getVendNombre(vend)} <span style="font-size:11px;color:var(--gray);font-weight:400">@${vend}</span></div>
+          <div class="card-sub">${items.length} contactos para reactivar hoy</div>
+        </div>
+        <span class="campana-badge">🔔 HOY</span>
+      </div>
+      <div class="tw"><table><thead><tr>
+        <th>NUMERO</th><th>NOMBRE</th><th>ESTADO</th><th>SEMAFORO</th><th>ETAPA</th><th>FECHA ORIG.</th><th>ACCION</th>
+      </tr></thead><tbody>
+      ${items.map(cc => {
+        const c = cc.contactos;
+        return `<tr class="campana-row">
+          <td><code style="font-size:11px">${c?.numero||'—'}</code></td>
+          <td style="font-weight:600">${c?.nombre||'—'}</td>
+          <td>${c?.estado||'—'}</td>
+          <td>${semBadge(c?.semaforo)}</td>
+          <td>${etapaBadge(c?.etapa_actual||1)}</td>
+          <td>${fmtFecha(c?.fecha)}</td>
+          <td>
+            <div style="display:flex;gap:4px;flex-wrap:wrap">
+              <button class="estado-btn estado-sin"  onclick="clasificarContacto('${cc.id}','sin_respuesta')">Sin resp.</button>
+              <button class="estado-btn estado-resp" onclick="clasificarContacto('${cc.id}','respondio')">Respondio</button>
+              <button class="estado-btn estado-int"  onclick="clasificarContacto('${cc.id}','con_interes')">⭐ Interes</button>
+              <div style="position:relative;display:inline-block">
+                <button class="estado-btn estado-venta" onclick="togglePromoverMenu('${cc.id}',this)">🚀 Promover</button>
+                <div class="promover-menu" id="pm-${cc.id}">
+                  <div style="font-size:10px;font-weight:700;color:var(--gray);padding:4px 12px 6px">Mover a pipeline:</div>
+                  <div class="promover-opt" onclick="promoverCliente('${cc.id}',3)">🔥 <div><div style="font-weight:700">Cliente Caliente</div><div style="font-size:10px;color:var(--gray)">Mostro interes — cierre rapido</div></div></div>
+                  <div class="promover-opt" onclick="promoverCliente('${cc.id}',4)">💜 <div><div style="font-weight:700">Postventa</div><div style="font-size:10px;color:var(--gray)">Ya compro — seguimiento</div></div></div>
+                  <div class="promover-opt" onclick="promoverCliente('${cc.id}',1)">🔵 <div><div style="font-weight:700">Pipeline Estandar</div><div style="font-size:10px;color:var(--gray)">Proceso completo de 4 etapas</div></div></div>
+                  <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:4px">
+                    <div class="promover-opt" style="color:var(--red)" onclick="clasificarContacto('${cc.id}','inactivo')">❌ Marcar como inactivo</div>
+                  </div>
+                </div>
+              </div>
+              <button class="btn-icon" onclick='abrirContacto(${JSON.stringify(c)})' title="Ver detalle">✏️</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('')}
+      </tbody></table></div>
+    </div>`).join('');
+}
+
+async function cargarAgendaCampana() {
+  if (!_campanaActiva) return;
+  const { data } = await SB.from('campana_contactos')
+    .select('fecha_activacion, estado')
+    .eq('campana_id', _campanaActiva.id)
+    .order('fecha_activacion');
+  if (!data) return;
+
+  const byDate = {};
+  const hoy = new Date().toISOString().split('T')[0];
+  data.forEach(cc => {
+    const f = cc.fecha_activacion;
+    if (!byDate[f]) byDate[f] = { total: 0, completados: 0 };
+    byDate[f].total++;
+    if (cc.estado === 'completado') byDate[f].completados++;
+  });
+
+  const el = document.getElementById('agendaCalendar');
+  el.innerHTML = Object.entries(byDate).map(([fecha, d]) => {
+    const pct = Math.round(d.completados / d.total * 100);
+    const cls = fecha < hoy ? 'pasado' : fecha === hoy ? 'hoy' : 'futuro';
+    const lbl = fecha === hoy ? '🔔 HOY' : fecha < hoy ? `${pct}% completado` : 'Proximo';
+    return `<div class="agenda-day-card ${cls}" onclick="filtrarCampanaPorFecha('${fecha}')">
+      <div class="agenda-day-date">${fmtFecha(fecha)}</div>
+      <div class="agenda-day-count">${d.total}</div>
+      <div class="agenda-day-label">${lbl}</div>
+      ${fecha <= hoy && d.completados > 0 ? `<div style="margin-top:4px;height:4px;background:var(--ltgray);border-radius:2px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:var(--green)"></div></div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function switchCampanaTab(tab, btn) {
+  _campanaTab = tab;
+  document.querySelectorAll('#campanaTabs .preset-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.getElementById('campanaTabHoy').style.display    = tab === 'hoy'    ? 'block' : 'none';
+  document.getElementById('campanaTabAgenda').style.display = tab === 'agenda' ? 'block' : 'none';
+  document.getElementById('campanaTabCrear').style.display  = tab === 'crear'  ? 'block' : 'none';
+  if (tab === 'hoy')    cargarHoyCampana();
+  if (tab === 'agenda') cargarAgendaCampana();
+}
+
+function previewCampana() {
+  const desde = document.getElementById('cnDesde').value;
+  const hasta  = document.getElementById('cnHasta').value;
+  const inicio = document.getElementById('cnInicio').value;
+  if (!desde || !hasta || !inicio) { toast('Completa las fechas', 'err'); return; }
+  const d1 = new Date(desde), d2 = new Date(hasta), di = new Date(inicio);
+  const dias = Math.round((d2 - d1) / 86400000) + 1;
+  const fin  = new Date(di.getTime() + (dias - 1) * 86400000);
+  document.getElementById('cnPreview').innerHTML = `
+    <div style="font-weight:700;color:var(--teal);margin-bottom:8px">Vista previa de la campana:</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+      <div>📅 Duracion: <b>${dias} dias</b></div>
+      <div>🚀 Inicio: <b>${fmtFecha(inicio)}</b></div>
+      <div>🏁 Fin estimado: <b>${fmtFecha(fin.toISOString().split('T')[0])}</b></div>
+      <div>📆 Contactos de: <b>${fmtFecha(desde)} al ${fmtFecha(hasta)}</b></div>
+    </div>
+    <div style="margin-top:8px;padding:8px;background:#fffbeb;border-radius:6px;font-size:11px;color:#854d0e">
+      ⚡ Ejemplo: Los contactos del ${fmtFecha(desde)} se activaran el ${fmtFecha(inicio)}, los del ${fmtFecha(new Date(d1.getTime()+86400000).toISOString().split('T')[0])} se activaran el ${fmtFecha(new Date(di.getTime()+86400000).toISOString().split('T')[0])}, y asi sucesivamente.
+    </div>`;
+}
+
+async function crearCampana() {
+  const nombre = document.getElementById('cnNombre').value.trim();
+  const desc   = document.getElementById('cnDesc').value.trim();
+  const inicio = document.getElementById('cnInicio').value;
+  const desde  = document.getElementById('cnDesde').value;
+  const hasta  = document.getElementById('cnHasta').value;
+  if (!nombre || !inicio || !desde || !hasta) { toast('Completa todos los campos obligatorios', 'err'); return; }
+  const sems = [];
+  if (document.getElementById('cnBajo').checked)  sems.push('BAJO');
+  if (document.getElementById('cnMedio').checked) sems.push('MEDIO');
+  if (document.getElementById('cnAlto').checked)  sems.push('ALTO');
+  if (!sems.length) { toast('Selecciona al menos un semaforo', 'err'); return; }
+  if (!confirm(`Crear campana "${nombre}"?
+
+Contactos del ${fmtFecha(desde)} al ${fmtFecha(hasta)}
+Inicio: ${fmtFecha(inicio)}
+Semaforos: ${sems.join(', ')}`)) return;
+  const btn = event.target; btn.disabled = true; btn.textContent = 'Creando...';
+  const templateId = parseInt(document.getElementById('cnTemplate')?.value||'2');
+  const { data, error } = await SB.rpc('crear_campana', {
+    p_nombre: nombre, p_descripcion: desc || null,
+    p_inicio: inicio, p_origen_desde: desde, p_origen_hasta: hasta,
+    p_semaforos: sems, p_usuario: SESSION.usuario
+  });
+  btn.disabled = false; btn.textContent = 'Crear campana';
+  if (error) { toast('Error: ' + error.message, 'err'); return; }
+  if (!data?.ok) { toast('Error al crear', 'err'); return; }
+  toast(`✅ Campana creada — ${data.total_contactos} contactos asignados del ${fmtFecha(data.primer_dia)} al ${fmtFecha(data.ultimo_dia)}`, 'ok');
+  _campanaActiva = null;
+  await cargarCampanas();
+  switchCampanaTab('hoy', document.querySelector('#campanaTabs .preset-btn'));
+}
+
+async function completarCampanaContacto(ccId) {
+  const { error } = await SB.rpc('completar_contacto_campana', { p_cc_id: ccId });
+  if (error) { toast('Error: ' + error.message, 'err'); return; }
+  toast('✅ Contacto marcado como reactivado', 'ok');
+  cargarHoyCampana();
+}
+
 function toast(msg,type){
   const t=document.createElement('div');
   t.className='toast '+(type==='ok'?'ok':type==='info'?'info':'err');

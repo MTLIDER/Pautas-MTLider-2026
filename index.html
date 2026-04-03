@@ -1527,6 +1527,14 @@ async function cargarDashboard() {
   renderDash(data, desde, hasta, vend);
 }
 
+function kpi(label, value, sub, color) {
+  return `<div class="kpi-card" style="--kc:${color}">
+    <div class="kpi-label">${label}</div>
+    <div class="kpi-value" style="color:${color}">${value}</div>
+    <div class="kpi-sub">${sub}</div>
+  </div>`;
+}
+
 function renderDash(d, desde, hasta, vend) {
   if (!d) return;
   const sem = d.semaforo||{BAJO:0,MEDIO:0,ALTO:0,VENTA:0,DESCARTADO:0};

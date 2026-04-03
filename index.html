@@ -1513,13 +1513,8 @@ async function cargarDashboard() {
     p_desde: desde||null, p_hasta: hasta||null, p_vend: vend||null
   });
   if (error) { document.getElementById('kpiGrid').innerHTML=`<div class="loading">Error: ${error.message}</div>`; return; }
-  // Extra queries for charts
-  let cQuery = SB.from('contactos').select('estado,semaforo,horario,fecha,vendedora');
-  if (desde) cQuery=cQuery.gte('fecha',desde);
-  if (hasta) cQuery=cQuery.lte('fecha',hasta);
-  if (vend)  cQuery=cQuery.eq('vendedora',vend);
-  const { data:rows } = await cQuery;
-  renderDash(data, rows||[], desde, hasta, vend);
+  // Todo calculado en PostgreSQL — sin query extra
+  renderDash(data, desde, hasta, vend);
 }
 
 function renderDash(kpi_data, rows, desde, hasta, vend) {
@@ -1544,8 +1539,7 @@ function renderDash(kpi_data, rows, desde, hasta, vend) {
     </div>`).join('');
   // States
   const estCount={};
-  rows.forEach(r=>{if(r.estado&&r.estado!=='No encontrado')estCount[r.estado]=(estCount[r.estado]||0)+1;});
-  const allEst=Object.entries(estCount).sort((a,b)=>b[1]-a[1]);
+    const allEst=(d.topEstados||[]).map(e=>[e.estado,e.count]);
   const top10=allEst.slice(0,10);
   const maxE=top10[0]?.[1]||1;
   document.getElementById('estSub').textContent=`Mayor a menor (${allEst.length} estados)`;
@@ -1555,19 +1549,19 @@ function renderDash(kpi_data, rows, desde, hasta, vend) {
     <div class="bar-val">${c}</div></div>`).join('');
   document.getElementById('btnTodosEst').textContent=`Ver todos (${allEst.length})`;
   window._allEst=allEst;
-  // Heatmap horario
-  const horaCount=Array(24).fill(0);
-  rows.forEach(r=>{if(!r.horario)return;const m=String(r.horario).match(/^(\d{1,2}):/);if(m){const h=parseInt(m[1]);if(h>=0&&h<=23)horaCount[h]++;}});
-  const maxH=Math.max(...horaCount,1);
+  // Heatmap horario — ya calculado en servidor como objeto {"0":55,"1":23,...}
+  const horaObj = d.horaCount || {};
+  const horaCount = Array(24).fill(0).map((_,h)=>parseInt(horaObj[String(h)])||0);
+  const maxH = Math.max(...horaCount, 1);
   document.getElementById('heatGrid').innerHTML=horaCount.map((v,h)=>{
     const {bg,tc}=heatColor(v,maxH);
     const hr12=h%12||12,ap=h<12?'a':'p';
     return `<div class="hc" style="background:${bg};color:${tc};border:1px solid rgba(0,0,0,.06)" title="${h}:00 → ${v}">
       <div style="font-size:6.5px;opacity:.8">${hr12}${ap}</div><div style="font-size:8.5px;font-weight:800">${v||''}</div></div>`;
   }).join('');
-  // Dia de semana
-  const dowCount=[0,0,0,0,0,0,0];
-  rows.forEach(r=>{if(r.fecha){const d=new Date(r.fecha+'T00:00:00');dowCount[d.getDay()]++;}});
+  // Dia de semana — ya calculado en servidor {"0":45,"1":120,...} (0=Dom...6=Sab)
+  const dowObj = d.diasSemana || {};
+  const dowCount = Array(7).fill(0).map((_,i)=>parseInt(dowObj[String(i)])||0);
   const maxD=Math.max(...dowCount,1);
   const dowLabels=['D','L','M','Ms','J','V','S'],dowColors=['#ef4444','#00a0e9','#00a0e9','#00a0e9','#00a0e9','#00a0e9','#3b82f6'];
   document.getElementById('dowGrid').innerHTML=dowCount.map((v,i)=>`
@@ -1576,18 +1570,14 @@ function renderDash(kpi_data, rows, desde, hasta, vend) {
       <div class="dow-track"><div class="dow-fill" style="height:${Math.max(4,Math.round(v/maxD*66))}px;background:${dowColors[i]};opacity:${.5+.5*v/maxD}"></div></div>
       <div class="dow-lbl" style="color:${dowColors[i]}">${dowLabels[i]}</div>
     </div>`).join('');
-  // Tendencia
-  const byDate={};
-  rows.forEach(r=>{if(r.fecha)byDate[r.fecha]=(byDate[r.fecha]||0)+1;});
+  // Tendencia — ya viene del servidor como array de {fecha, full, count}
   const DIAS=['D','L','M','Ms','J','V','S'],dowC=['#ef4444','#00a0e9','#00a0e9','#00a0e9','#00a0e9','#00a0e9','#3b82f6'];
-  let tend=[];
-  const hoy=new Date();
-  for(let i=29;i>=0;i--){const d=new Date(hoy);d.setDate(d.getDate()-i);const k=d.toISOString().split('T')[0];tend.push({fecha:k.substring(5),full:k,count:byDate[k]||0});}
+  let tend = (d.tendencia||[]);  // tend items: {fecha:'MM-DD', full:'YYYY-MM-DD', count:N}
   const maxS=Math.max(...tend.map(t=>t.count),1);
   document.getElementById('sparkWrap').innerHTML=`<div style="display:flex;align-items:flex-end;gap:3px;width:100%;height:100px">`+
     tend.map((t,i)=>{
       const h=Math.max(4,Math.round(t.count/maxS*72));
-      const d=new Date(t.full+'T00:00:00'), dow=d.getDay();
+      const _dt=new Date((t.full||('2026-'+t.fecha))+'T00:00:00'), dow=_dt.getDay();
       const showF=i===0||i===tend.length-1||i%5===0;
       return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100px">
         <div style="font-size:8px;font-weight:800;color:var(--teal);margin-bottom:2px;min-height:12px">${t.count||''}</div>
@@ -1596,22 +1586,15 @@ function renderDash(kpi_data, rows, desde, hasta, vend) {
         <div style="font-size:7px;color:var(--gray);text-align:center">${showF?t.fecha:''}</div>
       </div>`;
     }).join('')+'</div>';
-  // Vendedoras
-  const byVend={};
-  rows.forEach(r=>{
-    const v=r.vendedora||'sin asignar';
-    if(!byVend[v])byVend[v]={nombre:v,total:0,ventas:0};
-    byVend[v].total++;
-    if(r.semaforo==='VENTA')byVend[v].ventas++;
-  });
+  // byVend ya viene del servidor en d.byVend
   const vcols=['var(--teal)','var(--green)','var(--amber)','var(--purple)','var(--red)'];
-  document.getElementById('vendGrid').innerHTML=Object.values(byVend).map((v,i)=>`
+  document.getElementById('vendGrid').innerHTML=(d.byVend||[]).map((v,i)=>`
     <div class="card" style="margin:0;border-top:4px solid ${vcols[i%vcols.length]}">
-      <div style="font-size:14px;font-weight:700;color:${vcols[i%vcols.length]};margin-bottom:8px">${v.nombre}</div>
+      <div style="font-size:14px;font-weight:700;color:${vcols[i%vcols.length]};margin-bottom:8px">${v.nombre||v.key}</div>
       <div class="bar-item" style="margin-bottom:5px"><div class="bar-name">Contactos</div><div class="bar-val" style="color:var(--dark);font-size:14px">${v.total}</div></div>
       <div class="bar-item"><div class="bar-name">Ventas</div><div class="bar-val" style="color:var(--purple);font-size:14px">${v.ventas}</div></div>
     </div>`).join('');
-  // Mexico map
+  // Mexico map — allEst already computed from server data above
   renderMexicoMap(allEst);
   // Compliance KPIs
   cargarCumplimiento();

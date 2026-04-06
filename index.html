@@ -505,6 +505,22 @@ tr:hover td{background:#f9fafb}
 [data-theme="dark"] .user-chip { background:var(--bg) !important; border-color:var(--border) !important; }
 [data-theme="dark"] .tw { border-color:var(--border) !important; }
 
+
+/* ── DIAS HABILES ─────────────────────────────────────────── */
+.dia-toggle{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:44px;height:38px;border-radius:9px;font-size:12px;font-weight:700;
+  cursor:pointer;border:2px solid var(--border);background:#fff;
+  color:var(--gray);transition:.15s;user-select:none
+}
+.dia-toggle:has(input:checked){
+  background:var(--teal);color:#fff;border-color:var(--teal)
+}
+.dia-toggle.sabado:has(input:checked){ background:#f97316;border-color:#f97316 }
+.dia-toggle.domingo:has(input:checked){ background:#ef4444;border-color:#ef4444 }
+.dia-toggle:hover{ border-color:var(--teal);color:var(--teal) }
+.dia-toggle.sabado:hover{ border-color:#f97316;color:#f97316 }
+.dia-toggle.domingo:hover{ border-color:#ef4444;color:#ef4444 }
 </style>
 </head>
 <body>
@@ -787,6 +803,21 @@ tr:hover td{background:#f9fafb}
               <label style="display:flex;align-items:center;gap:5px;font-size:12px"><input type="checkbox" id="cnBajo" checked> 🔵 Bajo</label>
               <label style="display:flex;align-items:center;gap:5px;font-size:12px"><input type="checkbox" id="cnMedio" checked> 🟡 Medio</label>
               <label style="display:flex;align-items:center;gap:5px;font-size:12px"><input type="checkbox" id="cnAlto"> 🟢 Alto</label>
+            </div>
+          </div>
+          <div class="field full">
+            <label>Dias habiles de la campana</label>
+            <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap" id="cnDiasGrid">
+              <label class="dia-toggle" data-d="1"><input type="checkbox" id="cnL" checked hidden> Lun</label>
+              <label class="dia-toggle" data-d="2"><input type="checkbox" id="cnM" checked hidden> Mar</label>
+              <label class="dia-toggle" data-d="3"><input type="checkbox" id="cnX" checked hidden> Mie</label>
+              <label class="dia-toggle" data-d="4"><input type="checkbox" id="cnJ" checked hidden> Jue</label>
+              <label class="dia-toggle" data-d="5"><input type="checkbox" id="cnV" checked hidden> Vie</label>
+              <label class="dia-toggle sabado" data-d="6"><input type="checkbox" id="cnS" hidden> Sab</label>
+              <label class="dia-toggle domingo" data-d="0"><input type="checkbox" id="cnD" hidden> Dom</label>
+            </div>
+            <div style="font-size:10px;color:var(--gray);margin-top:5px">
+              Los contactos de dias no seleccionados se mueven al siguiente dia habil automaticamente
             </div>
           </div>
           <div class="field"><label>Contactos desde (fecha original) *</label><input type="date" id="cnDesde" value="2025-12-01"></div>
@@ -2275,17 +2306,78 @@ async function cargarAgendaCampana() {
   }).join('');
 }
 
+// Dia toggle click handler
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.dia-toggle').forEach(lbl => {
+    lbl.addEventListener('click', () => {
+      const cb = lbl.querySelector('input[type=checkbox]');
+      if (cb) { cb.checked = !cb.checked; previewCampana(); }
+    });
+  });
+});
+
+function getDiasSeleccionados() {
+  const map = {0:'cnD',1:'cnL',2:'cnM',3:'cnX',4:'cnJ',5:'cnV',6:'cnS'};
+  return Object.entries(map)
+    .filter(([d,id]) => document.getElementById(id)?.checked)
+    .map(([d]) => parseInt(d));
+}
+
+function siguienteDiaHabil(fecha, diasHabiles) {
+  const d = new Date(fecha + 'T00:00:00');
+  let tries = 0;
+  while (!diasHabiles.includes(d.getDay()) && tries < 7) {
+    d.setDate(d.getDate() + 1);
+    tries++;
+  }
+  return d.toISOString().split('T')[0];
+}
+
 function previewCampana() {
   const desde=document.getElementById('cnDesde')?.value;
   const hasta=document.getElementById('cnHasta')?.value;
   const inicio=document.getElementById('cnInicio')?.value;
   if(!desde||!hasta||!inicio){toast('Completa las fechas','err');return;}
-  const dias=Math.round((new Date(hasta)-new Date(desde))/86400000)+1;
-  const fin=new Date(new Date(inicio).getTime()+(dias-1)*86400000);
+  const dias = Math.round((new Date(hasta) - new Date(desde)) / 86400000) + 1;
+  const diasH = getDiasSeleccionados();
+  const DNAMES = ['Dom','Lun','Mar','Mie','Jue','Vie','Sab'];
+  const diasNombre = diasH.sort((a,b)=>a-b).map(d=>DNAMES[d]).join(', ');
+
+  // Simulate campaign to find real end date (skipping non-work days)
+  let cursor = new Date(inicio + 'T00:00:00');
+  let origen = new Date(desde + 'T00:00:00');
+  let diasTotales = 0, diasSkipped = 0;
+  for (let i = 0; i < dias; i++) {
+    // advance cursor to next valid day
+    while (!diasH.includes(cursor.getDay())) { cursor.setDate(cursor.getDate()+1); diasSkipped++; }
+    cursor.setDate(cursor.getDate() + 1);
+    origen.setDate(origen.getDate() + 1);
+    diasTotales++;
+    if (diasTotales > 365) break;
+  }
+  cursor.setDate(cursor.getDate() - 1);
+  const finReal = cursor.toISOString().split('T')[0];
+  const finCalendario = new Date(new Date(inicio).getTime() + (dias-1+diasSkipped)*86400000).toISOString().split('T')[0];
+
+  // First contact activation
+  const primerDiaHabil = siguienteDiaHabil(inicio, diasH);
+
   document.getElementById('cnPreview').innerHTML=`
-    <div style="font-weight:700;color:var(--teal);margin-bottom:6px">Vista previa:</div>
-    <div style="font-size:12px">📅 Duracion: <b>${dias} dias</b> · Inicio: <b>${fmtFecha(inicio)}</b> · Fin: <b>${fmtFecha(fin.toISOString().split('T')[0])}</b></div>
-    <div style="margin-top:6px;font-size:11px;color:var(--amber)">Los contactos del ${fmtFecha(desde)} se activaran el ${fmtFecha(inicio)}, los del ${fmtFecha(new Date(new Date(desde).getTime()+86400000).toISOString().split('T')[0])} el dia siguiente, y asi sucesivamente.</div>`;
+    <div style="font-weight:700;color:var(--teal);margin-bottom:8px">Vista previa:</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;margin-bottom:8px">
+      <div>📅 Contactos: <b>${dias} dias de origen</b></div>
+      <div>🗓 Duracion real: <b>${diasTotales} dias habiles</b></div>
+      <div>▶️ Primer dia: <b>${fmtFecha(primerDiaHabil)}</b></div>
+      <div>🏁 Ultimo dia: <b>${fmtFecha(finReal)}</b></div>
+      <div>✅ Dias habiles: <b>${diasNombre}</b></div>
+      <div>⏭ Dias saltados: <b>${diasSkipped} (no habiles)</b></div>
+    </div>
+    ${diasSkipped > 0 ? `<div style="background:#fff7ed;border-radius:7px;padding:8px;font-size:11px;color:#c2410c">
+      ⚠️ Los contactos de Sab/Dom se movieron al siguiente dia habil automaticamente
+    </div>` : ''}
+    <div style="margin-top:6px;font-size:11px;color:var(--gray)">
+      Los contactos del ${fmtFecha(desde)} se activaran el ${fmtFecha(primerDiaHabil)}, y asi sucesivamente solo en dias seleccionados.
+    </div>`;
 }
 
 async function crearCampana() {
@@ -2301,9 +2393,12 @@ async function crearCampana() {
   if(document.getElementById('cnAlto')?.checked)sems.push('ALTO');
   if(!sems.length){toast('Selecciona al menos un semaforo','err');return;}
   if(!confirm(`Crear campana "${nombre}"?`))return;
+  const diasHab = getDiasSeleccionados();
+  if (!diasHab.length) { toast('Selecciona al menos un dia habil','err'); return; }
   const {data,error}=await SB.rpc('crear_campana',{
     p_nombre:nombre,p_descripcion:desc||null,p_inicio:inicio,
-    p_origen_desde:desde,p_origen_hasta:hasta,p_semaforos:sems,p_usuario:SESSION.usuario
+    p_origen_desde:desde,p_origen_hasta:hasta,p_semaforos:sems,
+    p_dias_habiles:diasHab,p_usuario:SESSION.usuario
   });
   if(error){toast('Error: '+error.message,'err');return;}
   if(!data?.ok){toast('Error al crear','err');return;}

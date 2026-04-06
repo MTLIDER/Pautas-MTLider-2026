@@ -823,6 +823,14 @@ tr:hover td{background:#f9fafb}
           <div class="field"><label>Nombre</label><input type="text" id="eNombre"></div>
           <div class="field"><label>Estado</label><select id="eEstado"></select></div>
           <div class="field"><label>Horario</label><input type="time" id="eHorario"></div>
+          <div class="field" id="eFechaWrap" style="display:none">
+            <label>📅 Fecha de registro <span style="font-size:10px;background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:50px;font-weight:700">ADMIN</span></label>
+            <input type="date" id="eFecha">
+          </div>
+          <div class="field" id="eVendedoraWrap" style="display:none">
+            <label>👤 Asesora asignada <span style="font-size:10px;background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:50px;font-weight:700">ADMIN</span></label>
+            <select id="eVendedora"></select>
+          </div>
           <div class="field"><label>Semaforo</label>
             <select id="eSemaforo" onchange="toggleVenta('e')">
               <option value="BAJO">🔵 Bajo</option><option value="MEDIO">🟡 Medio</option>
@@ -1326,6 +1334,9 @@ async function guardarEdicion() {
   const sem = document.getElementById('eSemaforo').value;
   const esV = sem==='VENTA';
   try {
+    // Admin: can change fecha and vendedora
+    const adminFecha = SESSION.rol==='ADMIN' ? document.getElementById('eFecha')?.value||null : null;
+    const adminVend  = SESSION.rol==='ADMIN' ? document.getElementById('eVendedora')?.value||null : null;
     const updates = {
       numero:   document.getElementById('eNumero').value.trim(),
       nombre:   document.getElementById('eNombre').value.trim()||null,
@@ -1334,6 +1345,8 @@ async function guardarEdicion() {
       semaforo: sem,
       pauta:    document.getElementById('ePauta').value||null,
       notas:    document.getElementById('eNotas').value.trim()||null,
+      ...(adminFecha && {fecha: adminFecha}),
+      ...(adminVend  && {vendedora: adminVend}),
     };
     const { error } = await SB.from('contactos').update(updates).eq('id',editingId);
     if (error) { toast('Error: '+error.message,'err'); btn.disabled=false; btn.textContent='Guardar cambios'; return; }

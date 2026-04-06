@@ -521,6 +521,33 @@ tr:hover td{background:#f9fafb}
 .dia-toggle:hover{ border-color:var(--teal);color:var(--teal) }
 .dia-toggle.sabado:hover{ border-color:#f97316;color:#f97316 }
 .dia-toggle.domingo:hover{ border-color:#ef4444;color:#ef4444 }
+
+/* ── FILTROS ACTIVIDAD DIA ────────────────────────────────── */
+.mis-act-btn{
+  display:inline-flex;align-items:center;gap:6px;padding:7px 14px;
+  border-radius:50px;font-size:12px;font-weight:700;cursor:pointer;
+  border:2px solid var(--border);background:#fff;color:var(--gray);
+  transition:.15s;white-space:nowrap
+}
+.mis-act-btn:hover{border-color:var(--teal);color:var(--teal)}
+.mis-act-btn.active{background:var(--teal);color:#fff;border-color:var(--teal)}
+.mis-act-cnt{
+  background:rgba(255,255,255,.25);color:inherit;
+  padding:1px 7px;border-radius:50px;font-size:10px;font-weight:800
+}
+.mis-act-btn:not(.active) .mis-act-cnt{background:var(--ltgray);color:var(--dark)}
+.tarea-hoy-badge{
+  display:inline-flex;align-items:center;gap:4px;padding:2px 8px;
+  border-radius:50px;font-size:10px;font-weight:700;
+  background:#dcfce7;color:#15803d;margin-left:6px
+}
+.tarea-pend-badge{
+  display:inline-flex;align-items:center;gap:4px;padding:2px 8px;
+  border-radius:50px;font-size:10px;font-weight:700;
+  background:#fef3c7;color:#b45309;margin-left:6px
+}
+.row-hoy td:first-child{border-left:3px solid var(--teal)}
+.row-pend td:first-child{border-left:3px solid var(--amber)}
 </style>
 </head>
 <body>
@@ -628,6 +655,21 @@ tr:hover td{background:#f9fafb}
   <div class="tab-panel" id="panel-misregistros">
     <div class="sec-title">Mis Registros</div>
     <div class="sec-sub" id="misSubTitle">Ultimos contactos capturados por ti</div>
+    <!-- Filtros rapidos de actividad -->
+    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap" id="misActBtns">
+      <button class="mis-act-btn active" onclick="setMisFiltro('hoy',this)" id="btnActHoy">
+        📅 Hoy <span class="mis-act-cnt" id="cntHoy">...</span>
+      </button>
+      <button class="mis-act-btn" onclick="setMisFiltro('pendientes',this)">
+        ⏰ Pendientes <span class="mis-act-cnt" id="cntPend">...</span>
+      </button>
+      <button class="mis-act-btn" onclick="setMisFiltro('semana',this)">
+        📆 Esta semana <span class="mis-act-cnt" id="cntSem">...</span>
+      </button>
+      <button class="mis-act-btn" onclick="setMisFiltro('todos',this)">
+        📋 Todos
+      </button>
+    </div>
     <div class="search-row">
       <div class="s-wrap"><span class="s-ico">🔍</span><input type="text" id="searchMis" placeholder="Buscar numero, nombre, estado..." oninput="debounceMis()"></div>
       <select class="f-sel" id="filtMisSem" onchange="cargarMisRegistros()"><option value="">Todos los semaforos</option><option value="BAJO">Bajo</option><option value="MEDIO">Medio</option><option value="ALTO">Alto</option><option value="VENTA">Venta</option><option value="DESCARTADO">Descartado</option></select>
@@ -1240,17 +1282,95 @@ const PAGE_SIZE = 30;
 
 function debounceMis() { clearTimeout(misDebounce); misDebounce=setTimeout(()=>cargarMisRegistros(),400); }
 
+let _misFiltro = 'hoy'; // hoy | pendientes | semana | todos
+
+function setMisFiltro(filtro, btn) {
+  _misFiltro = filtro;
+  document.querySelectorAll('.mis-act-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  cargarMisRegistros(1);
+}
+
+async function cargarConteosTareas() {
+  const hoy  = new Date().toISOString().split('T')[0];
+  const lunes = new Date(); lunes.setDate(lunes.getDate() - lunes.getDay() + 1);
+  const dom   = new Date(lunes); dom.setDate(lunes.getDate() + 6);
+  const lunStr = lunes.toISOString().split('T')[0];
+  const domStr = dom.toISOString().split('T')[0];
+
+  const {data} = await SB.from('etapas_checks')
+    .select('fecha_programada, contacto_id, contactos!inner(vendedora)')
+    .eq('completado', false)
+    .eq('contactos.vendedora', SESSION.usuario);
+
+  if (!data) return;
+  let cHoy=0, cPend=0, cSem=0;
+  const seenHoy=new Set(), seenPend=new Set(), seenSem=new Set();
+  data.forEach(t => {
+    const f = t.fecha_programada;
+    if (!f) return;
+    const id = t.contacto_id;
+    if (f === hoy)             { if(!seenHoy.has(id)) {seenHoy.add(id); cHoy++;} }
+    if (f < hoy)               { if(!seenPend.has(id)){seenPend.add(id);cPend++;} }
+    if (f >= lunStr && f <= domStr) { if(!seenSem.has(id)){seenSem.add(id);cSem++;} }
+  });
+  const el = id => document.getElementById(id);
+  if(el('cntHoy'))  el('cntHoy').textContent  = cHoy;
+  if(el('cntPend')) el('cntPend').textContent = cPend;
+  if(el('cntSem'))  el('cntSem').textContent  = cSem;
+}
+
 async function cargarMisRegistros(page=1) {
   misPage = page;
   document.getElementById('misContent').innerHTML = '<div class="loading"><div class="sp"></div></div>';
   const q   = document.getElementById('searchMis').value.trim();
   const sem = document.getElementById('filtMisSem').value;
   const from = (page-1)*PAGE_SIZE, to = from+PAGE_SIZE-1;
+  const hoyStr  = new Date().toISOString().split('T')[0];
+  const lunes   = new Date(); lunes.setDate(lunes.getDate() - lunes.getDay() + 1);
+  const domSem  = new Date(lunes); domSem.setDate(lunes.getDate() + 6);
+  const lunStr  = lunes.toISOString().split('T')[0];
+  const domStr  = domSem.toISOString().split('T')[0];
+
+  let contactIdsFiltro = null;
+
+  // Si filtro es por actividad, obtener IDs de contactos con tareas en ese periodo
+  if (_misFiltro !== 'todos') {
+    let tQuery = SB.from('etapas_checks')
+      .select('contacto_id, contactos!inner(vendedora)')
+      .eq('completado', false)
+      .eq('contactos.vendedora', SESSION.usuario);
+    if (_misFiltro === 'hoy')        tQuery = tQuery.eq('fecha_programada', hoyStr);
+    if (_misFiltro === 'pendientes') tQuery = tQuery.lt('fecha_programada', hoyStr);
+    if (_misFiltro === 'semana')     tQuery = tQuery.gte('fecha_programada', lunStr).lte('fecha_programada', domStr);
+    const {data: tData} = await tQuery;
+    contactIdsFiltro = [...new Set((tData||[]).map(t => t.contacto_id))];
+  }
+
   let query = SB.from('contactos').select('*',{count:'exact'})
-    .eq('vendedora', SESSION.usuario).order('fecha','descending').order('created_at','descending')
+    .eq('vendedora', SESSION.usuario)
+    .order('fecha',{ascending:false}).order('created_at',{ascending:false})
     .range(from, to);
   if (sem) query = query.eq('semaforo', sem);
   if (q)   query = query.or(`numero.ilike.%${q}%,nombre.ilike.%${q}%,estado.ilike.%${q}%,notas.ilike.%${q}%`);
+  if (contactIdsFiltro !== null) {
+    if (!contactIdsFiltro.length) {
+      // No hay contactos con tareas en este periodo
+      document.getElementById('misContent').innerHTML = `
+        <div style="text-align:center;padding:40px;color:var(--gray)">
+          <div style="font-size:36px;margin-bottom:12px">${_misFiltro==='hoy'?'✅':'📭'}</div>
+          <div style="font-size:14px;font-weight:700;margin-bottom:6px">
+            ${_misFiltro==='hoy'?'Sin tareas para hoy 🎉':_misFiltro==='pendientes'?'Sin tareas vencidas':'Sin tareas esta semana'}
+          </div>
+          <div style="font-size:12px">${_misFiltro==='hoy'?'Todas las tareas de hoy estan completadas o aun no tienes contactos':''}
+          </div>
+        </div>`;
+      document.getElementById('misPager').innerHTML = '';
+      document.getElementById('misSubTitle').textContent = '0 contactos';
+      return;
+    }
+    query = query.in('id', contactIdsFiltro);
+  }
   const { data, count, error } = await query;
   if (error) { document.getElementById('misContent').innerHTML=`<div class="loading">Error: ${error.message}</div>`; return; }
   document.getElementById('misSubTitle').textContent = `${count||0} contactos · pagina ${page}`;

@@ -1312,6 +1312,24 @@ async function abrirContacto(row) {
   sv('eHorario',row.horario); sv('eSemaforo',row.semaforo);
   sv('ePauta',row.pauta); sv('eNotas',row.notas);
   sv('eMonto',''); sv('eFolio',''); sv('eFechaVenta','');
+  // Mostrar campos de admin (fecha y vendedora)
+  const eFW = document.getElementById('eFechaWrap');
+  const eVW = document.getElementById('eVendedoraWrap');
+  if (SESSION.rol === 'ADMIN') {
+    if (eFW) { eFW.style.display = 'block'; document.getElementById('eFecha').value = row.fecha||''; }
+    if (eVW) {
+      eVW.style.display = 'block';
+      const eVSel = document.getElementById('eVendedora');
+      eVSel.innerHTML = vendedoras.map(v =>
+        `<option value="${v.usuario}" ${v.usuario===row.vendedora?'selected':''}>${v.nombre||v.usuario}</option>`
+      ).join('');
+    }
+  } else {
+    if (eFW) eFW.style.display = 'none';
+    if (eVW) eVW.style.display = 'none';
+  }
+  // Lada hint
+  autocompletarEstado(row.numero||'', 'eEstado', 'eladaHint');
   document.getElementById('ventaE').classList.remove('on');
   if (row.semaforo==='VENTA') {
     document.getElementById('ventaE').classList.add('on');
@@ -1339,7 +1357,7 @@ async function guardarEdicion() {
   const sem = document.getElementById('eSemaforo').value;
   const esV = sem==='VENTA';
   try {
-    // Admin: can change fecha and vendedora
+    // Admin: puede cambiar fecha y vendedora
     const adminFecha = SESSION.rol==='ADMIN' ? document.getElementById('eFecha')?.value||null : null;
     const adminVend  = SESSION.rol==='ADMIN' ? document.getElementById('eVendedora')?.value||null : null;
     const updates = {
@@ -1350,6 +1368,8 @@ async function guardarEdicion() {
       semaforo: sem,
       pauta:    document.getElementById('ePauta').value||null,
       notas:    document.getElementById('eNotas').value.trim()||null,
+      ...(adminFecha && {fecha: adminFecha}),
+      ...(adminVend  && {vendedora: adminVend}),
       ...(adminFecha && {fecha: adminFecha}),
       ...(adminVend  && {vendedora: adminVend}),
     };

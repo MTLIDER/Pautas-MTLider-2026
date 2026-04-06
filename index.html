@@ -1629,70 +1629,136 @@ function mostrarTareasData(byEtapa, etapaActual, checks, contactoId, verEtapa=nu
   const tasks = byEtapa[etapa] || [];
   const isLocked = etapa > etapaActual;
   const el = document.getElementById('pipelineTasks');
-  if (!tasks.length) { el.innerHTML='<div style="padding:12px;color:var(--gray);font-size:12px">Sin tareas configuradas para esta etapa.</div>'; return; }
-  el.innerHTML = `<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:10px;padding:0 2px">
-    ${ETAPA_NOMBRES[etapa-1]||('Etapa '+etapa)} ${isLocked?'<span style="color:var(--gray);font-weight:400">(bloqueada — completa la etapa anterior)</span>':''}
-  </div>` +
-  tasks.map(t => {
+  if (!tasks.length) { el.innerHTML='<div style="padding:12px;color:var(--gray);font-size:12px">Sin tareas configuradas.</div>'; return; }
+
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+
+  // Clasificar tareas
+  const vencidas    = tasks.filter(t => !t.completado && t.fecha_programada && new Date(t.fecha_programada+'T00:00:00') < hoy);
+  const hoyTasks    = tasks.filter(t => !t.completado && t.fecha_programada && new Date(t.fecha_programada+'T00:00:00').getTime() === hoy.getTime());
+  const completadas = tasks.filter(t => t.completado);
+  const futuras     = tasks.filter(t => !t.completado && t.fecha_programada && new Date(t.fecha_programada+'T00:00:00') > hoy);
+  const sinFecha    = tasks.filter(t => !t.completado && !t.fecha_programada);
+
+  // Banner de alerta si hay vencidas
+  let bannerHtml = '';
+  if (!isLocked && vencidas.length > 0) {
+    bannerHtml = `
+    <div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:flex-start;gap:10px">
+      <div style="font-size:20px">⚠️</div>
+      <div>
+        <div style="font-size:12px;font-weight:800;color:#991b1b;margin-bottom:3px">
+          ${vencidas.length} tarea${vencidas.length>1?'s':''} vencida${vencidas.length>1?'s':''} — debes completarlas para avanzar
+        </div>
+        <div style="font-size:11px;color:#b91c1c">
+          Estas tareas quedaron pendientes de dias anteriores. Completa primero las vencidas, luego continua con las de hoy.
+        </div>
+      </div>
+    </div>`;
+  }
+
+  const renderTask = (t, urgencia='normal') => {
     const hasRecurso = t.recurso_url && t.recurso_tipo;
     const tipoIcoMap = {video:'🎬',documento:'📄',enlace:'🔗',imagen:'🖼️'};
-    const tipoNomMap = {video:'Ver / Descargar video',documento:'Abrir documento',enlace:'Abrir enlace',imagen:'Ver imagen'};
-    // Calcular si esta disponible por tiempo
-    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    const tipoNomMap = {video:'Ver video',documento:'Abrir doc',enlace:'Abrir enlace',imagen:'Ver imagen'};
     const fProg = t.fecha_programada ? new Date(t.fecha_programada+'T00:00:00') : null;
     const diasRestantes = fProg ? Math.ceil((fProg-hoy)/(1000*60*60*24)) : 0;
     const disponibleHoy = !fProg || diasRestantes <= 0;
-    const disponibleProximo = fProg && diasRestantes > 0 && diasRestantes <= 3;
-    // Bloque de tiempo
-    const tiempoBloque = (!disponibleHoy && !t.completado && !isLocked) ? `
-      <div class="tarea-bloqueada-tiempo">
-        <span style="font-size:16px">⏰</span>
+
+    // Estilos por urgencia
+    let borderColor = 'var(--border)';
+    let bgColor     = '#fff';
+    let etiqueta    = '';
+    if (urgencia === 'vencida') {
+      borderColor = '#ef4444';
+      bgColor     = '#fff5f5';
+      etiqueta    = `<span style="background:#fee2e2;color:#991b1b;font-size:9px;font-weight:800;padding:2px 6px;border-radius:50px;margin-left:6px">VENCIDA</span>`;
+    } else if (urgencia === 'hoy') {
+      borderColor = 'var(--teal)';
+      bgColor     = '#f0f9ff';
+      etiqueta    = `<span style="background:#dbeafe;color:#1d4ed8;font-size:9px;font-weight:800;padding:2px 6px;border-radius:50px;margin-left:6px">HOY</span>`;
+    }
+
+    // Tiempo bloque / disponible hoy
+    let tiempoBloque = '';
+    if (!disponibleHoy && !t.completado && !isLocked) {
+      tiempoBloque = `<div class="tarea-bloqueada-tiempo">
+        <span style="font-size:14px">⏰</span>
         <div>
           <div class="countdown">Disponible en ${diasRestantes} dia${diasRestantes!==1?'s':''}</div>
           <div class="fecha-prog">📅 ${fmtFecha(t.fecha_programada)}</div>
         </div>
-      </div>` : (disponibleHoy && !t.completado && !isLocked && fProg) ? `
-      <div class="disponible-hoy">✅ Disponible hoy — envia este mensaje</div>` : '';
-    // Boton de recurso: bloqueado si no ha llegado la fecha
+      </div>`;
+    } else if (urgencia === 'hoy' && !t.completado && !isLocked) {
+      tiempoBloque = `<div class="disponible-hoy">✅ Disponible hoy — envia este mensaje</div>`;
+    } else if (urgencia === 'vencida') {
+      tiempoBloque = `<div style="font-size:10px;color:#ef4444;margin-top:3px">📅 Era para el ${fmtFecha(t.fecha_programada)} — completa ahora</div>`;
+    }
+
     const recursoDisponible = hasRecurso && !isLocked && disponibleHoy;
-    const recursoBloqueadoTiempo = hasRecurso && !isLocked && !disponibleHoy;
-    const recursoBtn = recursoDisponible ? `
-      <button class="recurso-btn ${t.recurso_tipo} ${t.recurso_abierto?'abierto':''}"
-        onclick="abrirRecurso('${t.id}','${t.recurso_url}','${contactoId}')">
-        ${tipoIcoMap[t.recurso_tipo]} ${t.recurso_nombre||tipoNomMap[t.recurso_tipo]}
-        ${t.recurso_abierto?'<span style=\'font-size:9px;opacity:.7\'> ✓ abierto</span>':''}
-      </button>`
-    : recursoBloqueadoTiempo ? `
-      <div style="display:flex;align-items:center;gap:6px;padding:5px 10px;background:#f8fafc;border:1.5px solid var(--ltgray);border-radius:7px;font-size:11px;color:var(--gray)">
-        🔒 ${tipoIcoMap[t.recurso_tipo]} ${t.recurso_nombre||tipoNomMap[t.recurso_tipo]}
-        <span style="font-size:9px">· disponible ${fmtFecha(t.fecha_programada)}</span>
-      </div>` : '';
+    const recursoBloq       = hasRecurso && !isLocked && !disponibleHoy;
+    const recursoBtn = recursoDisponible
+      ? `<button class="recurso-btn ${t.recurso_tipo} ${t.recurso_abierto?'abierto':''}"
+          onclick="abrirRecurso('${t.id}','${t.recurso_url}','${contactoId}')">
+          ${tipoIcoMap[t.recurso_tipo]} ${t.recurso_nombre||tipoNomMap[t.recurso_tipo]}
+          ${t.recurso_abierto?'<span style="font-size:9px;opacity:.7"> ✓ abierto</span>':''}
+        </button>`
+      : recursoBloq
+      ? `<div style="display:flex;align-items:center;gap:6px;padding:5px 10px;background:#f8fafc;border:1.5px solid var(--ltgray);border-radius:7px;font-size:11px;color:var(--gray)">
+          🔒 ${tipoIcoMap[t.recurso_tipo]} ${t.recurso_nombre||tipoNomMap[t.recurso_tipo]}
+          <span style="font-size:9px">· disponible ${fmtFecha(t.fecha_programada)}</span>
+        </div>` : '';
+
+    const canCheck = !isLocked && disponibleHoy;
     return `
-    <div class="task-item">
-      <div class="task-check ${t.completado?'done':''} ${isLocked?'locked':''}"
+    <div class="task-item" style="border-left:3px solid ${borderColor};background:${bgColor};margin-bottom:7px;border-radius:9px;padding:10px 12px">
+      <div class="task-check ${t.completado?'done':''} ${isLocked||(!disponibleHoy&&!t.completado)?'locked':''}"
         onclick="${isLocked?`toast('Completa la etapa anterior primero','err')`:
+          !disponibleHoy&&!t.completado?`toast('Esta tarea aun no esta disponible','info')`:
           `toggleTarea('${t.id}',${t.completado},'${contactoId}')`}">
         ${t.completado?'✓':''}
       </div>
       <div style="flex:1">
-        <div class="task-text ${t.completado?'done':''}">${t.tarea}</div>
+        <div class="task-text ${t.completado?'done':''}">${t.tarea}${etiqueta}</div>
         ${tiempoBloque}
         ${recursoBtn}
         ${t.completado&&t.completado_por?`<div class="task-meta">✓ ${t.completado_por} · ${fmtFecha(t.completado_at?.substring(0,10))}</div>`:''}
       </div>
     </div>`;
-  }).join('');
+  };
+
+  // Secciones agrupadas
+  let html = `<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:10px;padding:0 2px">
+    ${ETAPA_NOMBRES[etapa-1]||('Etapa '+etapa)} ${isLocked?'<span style="color:var(--gray);font-weight:400">(bloqueada)</span>':''}
+  </div>` + bannerHtml;
+
+  if (!isLocked) {
+    if (vencidas.length) {
+      html += `<div style="font-size:10px;font-weight:800;color:#991b1b;margin:8px 0 5px;letter-spacing:.5px">⚠️ VENCIDAS — COMPLETA PRIMERO</div>`;
+      html += vencidas.map(t => renderTask(t,'vencida')).join('');
+    }
+    if (hoyTasks.length) {
+      html += `<div style="font-size:10px;font-weight:800;color:var(--teal);margin:8px 0 5px;letter-spacing:.5px">📅 PARA HOY</div>`;
+      html += hoyTasks.map(t => renderTask(t,'hoy')).join('');
+    }
+    if (sinFecha.length) {
+      html += sinFecha.map(t => renderTask(t,'hoy')).join('');
+    }
+    if (futuras.length) {
+      html += `<div style="font-size:10px;font-weight:800;color:var(--gray);margin:8px 0 5px;letter-spacing:.5px">⏳ PROXIMAS</div>`;
+      html += futuras.map(t => renderTask(t,'futura')).join('');
+    }
+    if (completadas.length) {
+      html += `<div style="font-size:10px;font-weight:800;color:var(--gray);margin:8px 0 5px;letter-spacing:.5px">✓ COMPLETADAS</div>`;
+      html += completadas.map(t => renderTask(t,'completada')).join('');
+    }
+  } else {
+    html += tasks.map(t => renderTask(t)).join('');
+  }
+
+  el.innerHTML = html;
 }
 
-async function toggleTarea(checkId, estaba, contactoId) {
-  const fn = estaba ? 'descompletar_tarea' : 'completar_tarea';
-  const args = estaba ? {p_check_id:checkId} : {p_check_id:checkId, p_usuario:SESSION.usuario};
-  const { data, error } = await SB.rpc(fn, args);
-  if (error || !data?.ok) { toast(data?.msg||error?.message||'Error','err'); return; }
-  // Reload pipeline
-  const { data:contacto } = await SB.from('contactos').select('etapa_actual').eq('id',contactoId).single();
-  cargarPipeline(contactoId, contacto?.etapa_actual||1);
-}
 
 async function avanzarEtapa(contactoId) {
   const { data, error } = await SB.rpc('avanzar_etapa', {p_contacto_id:contactoId, p_usuario:SESSION.usuario});

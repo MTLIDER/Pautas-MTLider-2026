@@ -568,7 +568,9 @@ tr:hover td{background:#f9fafb}
       <div class="form-grid">
         <div class="field">
           <label>Numero de telefono *</label>
-          <input type="tel" id="fNumero" placeholder="ej. 5551234567">
+          <input type="tel" id="fNumero" placeholder="ej. 5551234567"
+            oninput="autocompletarEstado(this.value,'fEstado','ladaHint')">
+          <div id="ladaHint" style="margin-top:4px;min-height:16px"></div>
         </div>
         <div class="field">
           <label>Fecha de contacto *</label>
@@ -819,7 +821,10 @@ tr:hover td{background:#f9fafb}
       <!-- TAB: DATOS -->
       <div id="mPanelDatos">
         <div class="form-grid">
-          <div class="field"><label>Numero</label><input type="tel" id="eNumero"></div>
+          <div class="field"><label>Numero</label>
+            <input type="tel" id="eNumero" oninput="autocompletarEstado(this.value,'eEstado','eladaHint')">
+            <div id="eladaHint" style="margin-top:3px;min-height:14px"></div>
+          </div>
           <div class="field"><label>Nombre</label><input type="text" id="eNombre"></div>
           <div class="field"><label>Estado</label><select id="eEstado"></select></div>
           <div class="field"><label>Horario</label><input type="time" id="eHorario"></div>
@@ -2412,6 +2417,289 @@ function renderTimeline(checks, parent) {
   // Mini timeline de tareas en el pipeline — placeholder
   // Las tareas ya se muestran en las etapas del pipeline
 }
+
+// ================================================================
+// DETECCION AUTOMATICA DE LADA — Mexico
+// ================================================================
+const LADAS_MX = {
+  // CDMX / EDOMEX
+  "55":"Ciudad de Mexico","56":"Ciudad de Mexico",
+  "588":"Estado de Mexico","591":"Estado de Mexico","592":"Estado de Mexico",
+  "593":"Estado de Mexico","594":"Texcoco, EdoMex","595":"Estado de Mexico",
+  "596":"Toluca, EdoMex","597":"Estado de Mexico",
+  "721":"Toluca, EdoMex","722":"Toluca, EdoMex","728":"Toluca, EdoMex",
+  "713":"Estado de Mexico","714":"Estado de Mexico","715":"Estado de Mexico",
+  "716":"Estado de Mexico","717":"Estado de Mexico","718":"Estado de Mexico",
+  "719":"Estado de Mexico","726":"Estado de Mexico","727":"Estado de Mexico",
+  // AGUASCALIENTES
+  "449":"Aguascalientes","495":"Aguascalientes",
+  // BAJA CALIFORNIA
+  "646":"Ensenada, BC","664":"Tijuana, BC","665":"Tecate, BC",
+  "686":"Mexicali, BC","685":"San Felipe, BC",
+  // BAJA CALIFORNIA SUR
+  "612":"La Paz, BCS","624":"Los Cabos, BCS","613":"Loreto, BCS",
+  // CAMPECHE
+  "938":"Campeche","982":"Campeche","996":"Campeche",
+  // CHIAPAS
+  "916":"Villahermosa, Chis","961":"Tuxtla Gutierrez, Chis",
+  "962":"San Cristobal, Chis","963":"Comitan, Chis",
+  "964":"Tapachula, Chis","965":"Tonala, Chis",
+  "966":"Arriaga, Chis","967":"Ocosingo, Chis","968":"Palenque, Chis",
+  // CHIHUAHUA
+  "614":"Chihuahua","626":"Cuauhtemoc, Chih","627":"Guerrero, Chih",
+  "628":"Ojinaga, Chih","629":"Delicias, Chih",
+  "635":"Nuevo Casas Grandes, Chih","636":"Casas Grandes, Chih",
+  "648":"Camargo, Chih","649":"Hidalgo del Parral, Chih",
+  "625":"Ciudad Juarez, Chih","656":"Ciudad Juarez, Chih","657":"Ciudad Juarez, Chih",
+  // COAHUILA
+  "844":"Saltillo, Coah","841":"Piedras Negras, Coah",
+  "842":"Monclova, Coah","861":"Torreon, Coah","862":"Torreon, Coah",
+  "866":"Nuevo Laredo, Coah","867":"Nuevo Laredo, Coah",
+  "871":"Torreon, Coah","872":"Torreon, Coah","869":"Torreon, Coah",
+  // COLIMA
+  "312":"Colima","313":"Manzanillo, Col","314":"Manzanillo, Col",
+  // DURANGO
+  "618":"Durango","619":"Durango","674":"Durango","675":"Durango",
+  "676":"Durango","677":"Durango",
+  // GUANAJUATO
+  "411":"San Miguel de Allende, Gto","412":"San Miguel de Allende, Gto",
+  "413":"Celaya, Gto","415":"Celaya, Gto","416":"Guanajuato capital",
+  "418":"Salvatierra, Gto","419":"Salamanca, Gto",
+  "421":"Dolores Hidalgo, Gto","422":"Dolores Hidalgo, Gto",
+  "429":"Silao, Gto","432":"Irapuato, Gto","433":"Irapuato, Gto",
+  "461":"Irapuato, Gto","462":"Irapuato, Gto","464":"Irapuato, Gto",
+  "465":"Leon, Gto","466":"Leon, Gto","467":"Leon, Gto",
+  "472":"Leon, Gto","473":"Silao, Gto","474":"Silao, Gto",
+  "476":"Leon, Gto","477":"Leon, Gto","478":"Leon, Gto","479":"Leon, Gto",
+  // GUERRERO
+  "744":"Acapulco, Gro","745":"Acapulco, Gro","747":"Zihuatanejo, Gro",
+  "756":"Zihuatanejo, Gro","757":"Ometepec, Gro","762":"Taxco, Gro",
+  "767":"Iguala, Gro","769":"Chilpancingo, Gro",
+  // HIDALGO
+  "771":"Pachuca, Hgo","772":"Pachuca, Hgo","773":"Tulancingo, Hgo",
+  "774":"Actopan, Hgo","775":"Tula, Hgo","776":"Tizayuca, Hgo",
+  "779":"Mixquiahuala, Hgo",
+  // JALISCO
+  "33":"Guadalajara, Jal",
+  "315":"Jalisco","316":"Jalisco","317":"Jalisco","318":"Jalisco","319":"Nayarit/Jal",
+  "341":"Zapotlan, Jal","342":"Cd. Guzman, Jal","343":"Zapotlan, Jal",
+  "344":"La Barca, Jal","345":"Ocotlan, Jal","346":"Arandas, Jal",
+  "347":"Lagos de Moreno, Jal","348":"Tepatitlan, Jal","349":"Tepatitlan, Jal",
+  "371":"Ameca, Jal","372":"Tequila, Jal","373":"Tequila, Jal",
+  "374":"Tlaquepaque, Jal","375":"Tlaquepaque, Jal","376":"Tlaquepaque, Jal",
+  "377":"Puerto Vallarta, Jal","378":"Puerto Vallarta, Jal","379":"Autlan, Jal",
+  // MICHOACAN
+  "351":"Zamora, Mich","352":"Zamora, Mich","353":"Zamora, Mich",
+  "354":"La Piedad, Mich","355":"Sahuayo, Mich","356":"Zitacuaro, Mich",
+  "358":"Apatzingan, Mich","359":"Apatzingan, Mich",
+  "434":"Patzcuaro, Mich","435":"Patzcuaro, Mich","436":"Morelia, Mich",
+  "443":"Morelia, Mich","452":"Uruapan, Mich","453":"Uruapan, Mich",
+  "454":"Uruapan, Mich","455":"Zitacuaro, Mich","458":"Morelia, Mich",
+  // MORELOS
+  "735":"Cuautla, Mor","736":"Cuautla, Mor","751":"Cuernavaca, Mor",
+  "777":"Cuernavaca, Mor",
+  // NAYARIT
+  "311":"Tepic, Nay","323":"Tepic, Nay","324":"Tepic, Nay","325":"Tepic, Nay",
+  "326":"Tepic, Nay","327":"Bahia de Banderas, Nay","328":"Bahia de Banderas, Nay",
+  // NUEVO LEON
+  "81":"Monterrey, NL","82":"Monterrey, NL",
+  "821":"Monterrey, NL","823":"Monterrey, NL","824":"Monterrey, NL",
+  "825":"Monterrey, NL","826":"Monterrey, NL","827":"Monterrey, NL",
+  "828":"Monterrey, NL","829":"Monterrey, NL",
+  // OAXACA
+  "922":"Salina Cruz, Oax","924":"Oaxaca","951":"Oaxaca","952":"Oaxaca",
+  "953":"Oaxaca","954":"Puerto Escondido, Oax","958":"Huatulco, Oax",
+  "971":"Tuxtepec, Oax","972":"Tuxtepec, Oax",
+  // PUEBLA
+  "222":"Puebla","224":"Puebla","225":"Puebla","227":"Atlixco, Pue",
+  "228":"Tehuacan, Pue","229":"Tehuacan, Pue","231":"Tehuacan, Pue",
+  "232":"Tehuacan, Pue","233":"Zacatlan, Pue","237":"Huauchinango, Pue",
+  "238":"San Martin, Pue","241":"Chignahuapan, Pue","243":"Izucar, Pue",
+  "245":"Cholula, Pue","246":"Puebla","248":"Puebla","249":"Puebla",
+  // QUERETARO
+  "414":"Queretaro","419":"Queretaro","427":"Queretaro","441":"Queretaro","442":"Queretaro",
+  // QUINTANA ROO
+  "983":"Chetumal, QRoo","984":"Playa del Carmen, QRoo",
+  "987":"Cozumel, QRoo","988":"Isla Mujeres, QRoo","998":"Cancun, QRoo",
+  // SAN LUIS POTOSI
+  "444":"San Luis Potosi","445":"San Luis Potosi","446":"San Luis Potosi",
+  "481":"Cd. Valles, SLP","482":"Cd. Valles, SLP","483":"Rioverde, SLP",
+  "484":"Rioverde, SLP","485":"Matehuala, SLP","486":"Matehuala, SLP",
+  "487":"Matehuala, SLP","489":"Cd. Valles, SLP",
+  // SINALOA
+  "667":"Culiacan, Sin","668":"Los Mochis, Sin","669":"Mazatlan, Sin",
+  "673":"Guasave, Sin","696":"Escuinapa, Sin",
+  // SONORA
+  "631":"Nogales, Son","632":"Nogales, Son","633":"Agua Prieta, Son",
+  "634":"Navojoa, Son","637":"Caborca, Son","638":"Caborca, Son",
+  "641":"Obregon, Son","642":"Obregon, Son","643":"Guaymas, Son",
+  "644":"Hermosillo, Son","645":"Hermosillo, Son","647":"Hermosillo, Son",
+  "651":"Magdalena, Son","653":"Heroica Nogales, Son",
+  "662":"Hermosillo, Son","663":"Heroica Nogales, Son",
+  // TABASCO
+  "912":"Villahermosa, Tab","913":"Villahermosa, Tab",
+  "914":"Comalcalco, Tab","917":"Macuspana, Tab",
+  "918":"Villahermosa, Tab","919":"Villahermosa, Tab","921":"Cardenas, Tab",
+  "923":"Frontera, Tab","932":"Villahermosa, Tab","934":"Teapa, Tab",
+  // TAMAULIPAS
+  "833":"Tampico, Tamps","834":"Tampico, Tamps","835":"Tampico, Tamps",
+  "836":"Tampico, Tamps","837":"Tampico, Tamps","838":"Tampico, Tamps",
+  "861":"Nuevo Laredo, Tamps","862":"Nuevo Laredo, Tamps",
+  "867":"Nuevo Laredo, Tamps","868":"Matamoros, Tamps",
+  "871":"Reynosa, Tamps","872":"Reynosa, Tamps","899":"Reynosa, Tamps",
+  // TLAXCALA
+  "241":"Tlaxcala","242":"Tlaxcala","246":"Tlaxcala","248":"Apizaco, Tlax",
+  // VERACRUZ
+  "228":"Xalapa, Ver","229":"Veracruz puerto",
+  "231":"Orizaba, Ver","232":"Orizaba, Ver",
+  "272":"Coatzacoalcos, Ver","273":"Coatzacoalcos, Ver","274":"Cordoba, Ver",
+  "278":"Tuxpan, Ver","279":"Tuxpan, Ver","282":"Poza Rica, Ver",
+  "283":"Poza Rica, Ver","284":"Minatitlan, Ver","288":"Acayucan, Ver",
+  "294":"Coatzacoalcos, Ver","295":"Coatzacoalcos, Ver",
+  "296":"Coatzacoalcos, Ver","297":"Coatzacoalcos, Ver",
+  // YUCATAN
+  "985":"Merida, Yuc","986":"Valladolid, Yuc","988":"Progreso, Yuc",
+  "997":"Merida, Yuc","999":"Merida, Yuc",
+  // ZACATECAS
+  "492":"Zacatecas","493":"Zacatecas","494":"Fresnillo, Zac","498":"Jerez, Zac",
+};
+
+// Estado base por ciudad para mapear al selector
+const CIUDAD_A_ESTADO = {
+  "Ciudad de Mexico":["DF","Ciudad de Mexico"],
+  "Estado de Mexico":["Estado de Mexico","Estado de Mexico"],
+  "Toluca":["Estado de Mexico","Estado de Mexico"],
+  "Texcoco":["Estado de Mexico","Estado de Mexico"],
+  "Aguascalientes":["Aguascalientes","Aguascalientes"],
+  "Ensenada":["BC","Baja California"],
+  "Tijuana":["BC","Baja California"],
+  "Mexicali":["BC","Baja California"],
+  "La Paz":["BCS","Baja California Sur"],
+  "Los Cabos":["BCS","Baja California Sur"],
+  "Campeche":["Campeche","Campeche"],
+  "Tuxtla Gutierrez":["Chiapas","Chiapas"],
+  "San Cristobal":["Chiapas","Chiapas"],
+  "Tapachula":["Chiapas","Chiapas"],
+  "Chihuahua":["Chihuahua","Chihuahua"],
+  "Ciudad Juarez":["Chihuahua","Chihuahua"],
+  "Saltillo":["Coahuila","Coahuila"],
+  "Torreon":["Coahuila","Coahuila"],
+  "Monclova":["Coahuila","Coahuila"],
+  "Colima":["Colima","Colima"],
+  "Manzanillo":["Colima","Colima"],
+  "Durango":["Durango","Durango"],
+  "Guadalajara":["Jalisco","Jalisco"],
+  "Puerto Vallarta":["Jalisco","Jalisco"],
+  "Zapotlan":["Jalisco","Jalisco"],
+  "Cd. Guzman":["Jalisco","Jalisco"],
+  "Lagos de Moreno":["Jalisco","Jalisco"],
+  "Tepatitlan":["Jalisco","Jalisco"],
+  "Leon":["Guanajuato","Guanajuato"],
+  "Silao":["Guanajuato","Guanajuato"],
+  "Celaya":["Guanajuato","Guanajuato"],
+  "Irapuato":["Guanajuato","Guanajuato"],
+  "Guanajuato":["Guanajuato","Guanajuato"],
+  "San Miguel de Allende":["Guanajuato","Guanajuato"],
+  "Dolores Hidalgo":["Guanajuato","Guanajuato"],
+  "Acapulco":["Guerrero","Guerrero"],
+  "Zihuatanejo":["Guerrero","Guerrero"],
+  "Chilpancingo":["Guerrero","Guerrero"],
+  "Taxco":["Guerrero","Guerrero"],
+  "Pachuca":["Hidalgo","Hidalgo"],
+  "Tulancingo":["Hidalgo","Hidalgo"],
+  "Morelia":["Michoacan","Michoacan"],
+  "Uruapan":["Michoacan","Michoacan"],
+  "Zamora":["Michoacan","Michoacan"],
+  "La Piedad":["Michoacan","Michoacan"],
+  "Cuernavaca":["Morelos","Morelos"],
+  "Cuautla":["Morelos","Morelos"],
+  "Tepic":["Nayarit","Nayarit"],
+  "Bahia de Banderas":["Nayarit","Nayarit"],
+  "Monterrey":["Nuevo Leon","Nuevo Leon"],
+  "Oaxaca":["Oaxaca","Oaxaca"],
+  "Huatulco":["Oaxaca","Oaxaca"],
+  "Puerto Escondido":["Oaxaca","Oaxaca"],
+  "Puebla":["Puebla","Puebla"],
+  "Tehuacan":["Puebla","Puebla"],
+  "Queretaro":["Queretaro","Queretaro"],
+  "Cancun":["Quintana Roo","Quintana Roo"],
+  "Playa del Carmen":["Quintana Roo","Quintana Roo"],
+  "Chetumal":["Quintana Roo","Quintana Roo"],
+  "Cozumel":["Quintana Roo","Quintana Roo"],
+  "San Luis Potosi":["San Luis Potosi","San Luis Potosi"],
+  "Cd. Valles":["San Luis Potosi","San Luis Potosi"],
+  "Culiacan":["Sinaloa","Sinaloa"],
+  "Mazatlan":["Sinaloa","Sinaloa"],
+  "Los Mochis":["Sinaloa","Sinaloa"],
+  "Guasave":["Sinaloa","Sinaloa"],
+  "Hermosillo":["Sonora","Sonora"],
+  "Obregon":["Sonora","Sonora"],
+  "Nogales":["Sonora","Sonora"],
+  "Guaymas":["Sonora","Sonora"],
+  "Navojoa":["Sonora","Sonora"],
+  "Villahermosa":["Tabasco","Tabasco"],
+  "Tampico":["Tamaulipas","Tamaulipas"],
+  "Nuevo Laredo":["Tamaulipas","Tamaulipas"],
+  "Reynosa":["Tamaulipas","Tamaulipas"],
+  "Matamoros":["Tamaulipas","Tamaulipas"],
+  "Tlaxcala":["Tlaxcala","Tlaxcala"],
+  "Apizaco":["Tlaxcala","Tlaxcala"],
+  "Xalapa":["Veracruz","Veracruz"],
+  "Veracruz":["Veracruz","Veracruz"],
+  "Orizaba":["Veracruz","Veracruz"],
+  "Coatzacoalcos":["Veracruz","Veracruz"],
+  "Poza Rica":["Veracruz","Veracruz"],
+  "Cordoba":["Veracruz","Veracruz"],
+  "Tuxpan":["Veracruz","Veracruz"],
+  "Merida":["Yucatan","Yucatan"],
+  "Valladolid":["Yucatan","Yucatan"],
+  "Zacatecas":["Zacatecas","Zacatecas"],
+  "Fresnillo":["Zacatecas","Zacatecas"],
+};
+
+function detectarLada(numero) {
+  // Clean number
+  const n = numero.replace(/\D/g,'');
+  if (n.length < 7) return null;
+  // Try 2-digit lada (CDMX: 55, 56, NL: 81, 82, GDL: 33)
+  const l2 = n.substring(0,2);
+  if (LADAS_MX[l2]) return { lada: l2, ciudad: LADAS_MX[l2] };
+  // Try 3-digit lada
+  const l3 = n.substring(0,3);
+  if (LADAS_MX[l3]) return { lada: l3, ciudad: LADAS_MX[l3] };
+  return null;
+}
+
+function autocompletarEstado(numero, estadoSelectId, showHintId) {
+  const resultado = detectarLada(numero);
+  const hintEl = showHintId ? document.getElementById(showHintId) : null;
+  if (!resultado) {
+    if (hintEl) hintEl.innerHTML = '';
+    return;
+  }
+  const ciudad = resultado.ciudad;
+  // Find estado
+  const ciudadKey = Object.keys(CIUDAD_A_ESTADO).find(k => ciudad.includes(k));
+  const estadoInfo = ciudadKey ? CIUDAD_A_ESTADO[ciudadKey] : null;
+  // Try to set the estado select
+  const sel = document.getElementById(estadoSelectId);
+  if (sel && estadoInfo) {
+    const opts = Array.from(sel.options);
+    const match = opts.find(o =>
+      o.value.toLowerCase().includes(estadoInfo[1].toLowerCase()) ||
+      estadoInfo[1].toLowerCase().includes(o.value.toLowerCase())
+    );
+    if (match) {
+      sel.value = match.value;
+      if (hintEl) hintEl.innerHTML = `<span style="color:var(--teal);font-size:11px">📍 Lada ${resultado.lada} → ${ciudad} <span style="opacity:.7">(autodetectado)</span></span>`;
+    } else {
+      if (hintEl) hintEl.innerHTML = `<span style="color:var(--gray);font-size:11px">📍 Lada ${resultado.lada} → ${ciudad}</span>`;
+    }
+  } else {
+    if (hintEl) hintEl.innerHTML = `<span style="color:var(--gray);font-size:11px">📍 Lada ${resultado.lada} → ${ciudad}</span>`;
+  }
+}
+
 </script>
 </body>
 </html>

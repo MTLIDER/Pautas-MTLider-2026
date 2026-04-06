@@ -569,12 +569,21 @@ tr:hover td{background:#f9fafb}
         <div class="field">
           <label>Numero de telefono *</label>
           <input type="tel" id="fNumero" placeholder="ej. 5551234567">
-          <div class="fecha-hint" id="fechaHint"></div>
+        </div>
+        <div class="field">
+          <label>Fecha de contacto *</label>
+          <input type="date" id="fFecha">
+          <div style="font-size:10px;color:var(--gray);margin-top:3px">Selecciona la fecha real en que te contacto el cliente</div>
         </div>
         <div class="field"><label>Nombre del cliente</label><input type="text" id="fNombre" placeholder="Nombre o apodo"></div>
         <div class="field"><label>Estado</label><select id="fEstado"></select></div>
         <div class="field"><label>Horario de contacto</label><input type="time" id="fHorario"></div>
         <div class="field"><label>Pauta</label><select id="fPauta"><option value="">— Seleccionar —</option></select></div>
+        <div class="field admin-only" id="fVendadoraWrap" style="display:none">
+          <label>Asignar a asesora</label>
+          <select id="fVendedora"><option value="">— Mi registro —</option></select>
+          <div style="font-size:10px;color:var(--gray);margin-top:3px">Solo admins pueden asignar a otra asesora</div>
+        </div>
         <div class="field">
           <label>Semaforo *</label>
           <select id="fSemaforo" onchange="toggleVenta('f')">
@@ -1017,11 +1026,15 @@ async function initApp() {
     nav.appendChild(b);
   });
 
-  // Fecha hint
-  const fh = document.getElementById('fechaHint');
-  if (fh) {
-    const h = new Date();
-    fh.textContent = 'Se registrara con fecha: ' + h.getDate().toString().padStart(2,'0') + '/' + (h.getMonth()+1).toString().padStart(2,'0') + '/' + h.getFullYear();
+  // Set today's date as default in registration form
+  const fFecha = document.getElementById('fFecha');
+  if (fFecha) {
+    fFecha.value = new Date().toISOString().split('T')[0];
+  }
+  // Show vendedora field for admin
+  const fVW = document.getElementById('fVendadoraWrap');
+  if (fVW && SESSION.rol === 'ADMIN') {
+    fVW.style.display = 'block';
   }
 
   // Load vendedoras and pautas
@@ -1040,7 +1053,16 @@ async function cargarVendedoras() {
     const base = el.id === 'dashVend' ? '<option value="">Todas</option>' : '<option value="">Todas las asesoras</option>';
     el.innerHTML = base + vendedoras.map(v => `<option value="${v.usuario}">${v.nombre}</option>`).join('');
   });
+  // Also populate the asesora selector in registration form (admin only)
+  const fvSel = document.getElementById('fVendedora');
+  if (fvSel && SESSION.rol === 'ADMIN') {
+    fvSel.innerHTML = '<option value="">— Mi registro —</option>' +
+      vendedoras.filter(v=>v.rol==='ASESORA'||v.rol==='ADMIN').map(v=>
+        `<option value="${v.usuario}">${v.nombre||v.usuario}</option>`
+      ).join('');
+  }
 }
+
 
 async function cargarPautasLista() {
   const { data } = await SB.from('listas_config').select('valor').eq('tipo','PAUTA').order('orden');
@@ -1117,11 +1139,13 @@ async function registrarContacto() {
   if (!num) { toast('El numero es requerido.', 'err'); return; }
   const btn = document.getElementById('btnReg');
   btn.disabled=true; btn.textContent='Guardando...';
-  const sem = document.getElementById('fSemaforo').value;
-  const esV = sem === 'VENTA';
+  const sem   = document.getElementById('fSemaforo').value;
+  const esV   = sem === 'VENTA';
+  const fecha = document.getElementById('fFecha')?.value || new Date().toISOString().split('T')[0];
+  const vendedoraOverride = SESSION.rol==='ADMIN' ? (document.getElementById('fVendedora')?.value||null) : null;
   try {
     const { data, error } = await SB.rpc('crear_contacto_con_tareas', {
-      p_vendedora: SESSION.usuario,
+      p_vendedora: vendedoraOverride || SESSION.usuario,
       p_numero:   num,
       p_nombre:   document.getElementById('fNombre').value.trim() || null,
       p_estado:   document.getElementById('fEstado').value || null,
@@ -1129,29 +1153,40 @@ async function registrarContacto() {
       p_pauta:    document.getElementById('fPauta').value || null,
       p_notas:    document.getElementById('fNotas').value.trim() || null,
       p_semaforo: sem,
+      p_fecha:    fecha
     });
-    if (error) { toast('Error: ' + error.message, 'err'); btn.disabled=false; btn.textContent='Guardar Contacto'; return; }
-    // Registrar venta si aplica
+    if (error) throw error;
     if (esV) {
-      await SB.from('ventas').insert({
-        contacto_id: data, numero: num, vendedora: SESSION.usuario,
-        fecha_venta: document.getElementById('fFechaVenta').value || new Date().toISOString().split('T')[0],
-        monto: parseFloat(document.getElementById('fMonto').value)||0,
-        folio_nota: document.getElementById('fFolio').value.trim() || null,
-        compra_num: 1,
-      });
+      const monto = parseFloat(document.getElementById('fMonto')?.value)||0;
+      const folio = document.getElementById('fFolio')?.value.trim()||null;
+      const fv    = document.getElementById('fFechaVenta')?.value||fecha;
+      if (monto>0) {
+        await SB.from('ventas').insert({
+          contacto_id:data, vendedora: vendedoraOverride||SESSION.usuario,
+          numero:num, monto, folio_nota:folio, fecha_venta:fv
+        });
+      }
     }
-    toast('✅ Contacto registrado.', 'ok');
+    toast('✅ Contacto registrado con fecha '+fmtFecha(fecha), 'ok');
     limpiarForm();
-  } catch(e) { toast('Error: '+e.message,'err'); }
-  btn.disabled=false; btn.textContent='Guardar Contacto';
+    if(SESSION.rol!=='ADMIN') switchTab('misregistros');
+  } catch(e) {
+    toast('Error: '+e.message, 'err');
+  } finally {
+    btn.disabled=false; btn.textContent='Registrar';
+  }
 }
+
 
 function limpiarForm() {
   ['fNumero','fNombre','fHorario','fNotas','fMonto','fFolio','fFechaVenta'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   ['fEstado','fPauta','fSemaforo'].forEach(id=>{const e=document.getElementById(id);if(e)e.selectedIndex=0;});
   document.getElementById('ventaF').classList.remove('on');
+  // Reset date to today
+  const fd = document.getElementById('fFecha');
+  if (fd) fd.value = new Date().toISOString().split('T')[0];
 }
+
 
 // ================================================================
 // MIS REGISTROS (paginado)

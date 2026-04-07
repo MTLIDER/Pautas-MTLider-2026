@@ -1986,6 +1986,22 @@ function renderDash(d, desde, hasta, vend) {
   renderMexicoMap(allEst);
   // ── CUMPLIMIENTO ───────────────────────────────────────────────
   cargarCumplimiento();
+  // ── BITACORA (solo admin/director) ─────────────────────────────
+  const bitCard = document.getElementById('bitacoraCard');
+  if (bitCard) {
+    if (SESSION.rol === 'ADMIN' || SESSION.rol === 'DIRECTOR') {
+      bitCard.style.display = 'block';
+      cargarBitacora();
+      // Populate vendedoras filter
+      const bvSel = document.getElementById('bitVend');
+      if (bvSel && vendedoras.length) {
+        bvSel.innerHTML = '<option value="">Todas las asesoras</option>' +
+          vendedoras.map(v=>`<option value="${v.usuario}">${v.nombre||v.usuario}</option>`).join('');
+      }
+    } else {
+      bitCard.style.display = 'none';
+    }
+  }
 }
 
 
@@ -3012,6 +3028,73 @@ function autocompletarEstado(numero, estadoSelectId, showHintId) {
   } else {
     if (hintEl) hintEl.innerHTML = `<span style="color:var(--gray);font-size:11px">📍 Lada ${resultado.lada} → ${ciudad}</span>`;
   }
+}
+
+
+// ================================================================
+// BITACORA DE CAMBIOS
+// ================================================================
+const TIPO_LABELS = {
+  semaforo_cambio:   '🔄 Semaforo',
+  venta_cerrada:     '💰 Venta',
+  tarea_completada:  '✅ Tarea',
+  reasignacion:      '👤 Reasignacion',
+  fecha_cambio:      '📅 Fecha',
+  campana_creada:    '📣 Campana',
+  pipeline_cambio:   '⚙️ Pipeline',
+};
+const TIPO_COLORS = {
+  semaforo_cambio:   '#dbeafe',
+  venta_cerrada:     '#dcfce7',
+  tarea_completada:  '#f0fdf4',
+  reasignacion:      '#ede9fe',
+  fecha_cambio:      '#fef3c7',
+  campana_creada:    '#fff7ed',
+  pipeline_cambio:   '#f1f5f9',
+};
+
+async function cargarBitacora() {
+  const el = document.getElementById('bitacoraContent');
+  if (!el) return;
+  el.innerHTML = '<div class="loading"><div class="sp"></div></div>';
+  const vend  = document.getElementById('bitVend')?.value  || null;
+  const tipo  = document.getElementById('bitTipo')?.value  || null;
+  const desde = document.getElementById('bitDesde')?.value || null;
+  const hasta = document.getElementById('bitHasta')?.value || null;
+  const folio = document.getElementById('bitFolio')?.value || null;
+  const { data, error } = await SB.rpc('get_bitacora', {
+    p_usuario: vend, p_tipo: tipo,
+    p_desde: desde||null, p_hasta: hasta||null,
+    p_folio: folio||null, p_limit: 150
+  });
+  if (error || !data || !data.length) {
+    el.innerHTML = `<div style="padding:20px;text-align:center;color:var(--gray);font-size:12px">
+      ${error ? 'Error: ' + error.message : 'Sin eventos registrados aun. Los eventos apareceran automaticamente cuando se realicen cambios.'}
+    </div>`;
+    return;
+  }
+  el.innerHTML = `<div class="tw"><table>
+    <thead><tr>
+      <th style="width:80px">Fecha</th>
+      <th style="width:60px">Hora</th>
+      <th style="width:100px">Usuario</th>
+      <th style="width:120px">Evento</th>
+      <th style="width:70px">Folio</th>
+      <th>Descripcion</th>
+    </tr></thead>
+    <tbody>
+    ${data.map(ev=>`<tr style="border-left:3px solid ${TIPO_COLORS[ev.tipo]||'#e5e7eb'}">
+      <td style="font-size:11px;color:var(--gray)">${ev.fecha||'—'}</td>
+      <td style="font-size:11px;color:var(--gray)">${ev.hora||'—'}</td>
+      <td style="font-size:11px;font-weight:700;color:var(--teal)">${ev.usuario||'—'}</td>
+      <td><span style="background:${TIPO_COLORS[ev.tipo]||'#f1f5f9'};padding:2px 7px;border-radius:50px;font-size:10px;font-weight:700;white-space:nowrap">${TIPO_LABELS[ev.tipo]||ev.tipo}</span></td>
+      <td style="font-size:11px"><code>${ev.folio||'—'}</code></td>
+      <td style="font-size:11px;color:var(--dark)">${ev.descripcion||'—'}</td>
+    </tr>`).join('')}
+    </tbody></table></div>
+    <div style="margin-top:8px;font-size:10px;color:var(--gray);text-align:right">
+      Mostrando ${data.length} eventos · Los eventos se ordenan del mas reciente al mas antiguo
+    </div>`;
 }
 
 </script>

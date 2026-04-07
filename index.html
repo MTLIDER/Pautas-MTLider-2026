@@ -637,6 +637,16 @@ tr:hover td{background:#f9fafb}
             <option value="DESCARTADO">🔴 Descartado</option>
           </select>
         </div>
+        <div class="field">
+          <label>Tipo de cliente</label>
+          <select id="fTipoCliente">
+            <option value="">— Sin definir —</option>
+            <option value="MAYORISTA">🏪 Mayorista (negocio, reventa)</option>
+            <option value="MINORISTA">👤 Minorista (uso personal)</option>
+            <option value="DISTRIBUIDOR">🚚 Distribuidor regional</option>
+          </select>
+          <div style="font-size:10px;color:var(--gray);margin-top:3px">Identifica si el cliente tiene un negocio o compra para uso propio</div>
+        </div>
         <div class="field full"><label>Notas</label><textarea id="fNotas" placeholder="Informacion extra, observaciones..."></textarea></div>
         <div class="venta-sec full" id="ventaF">
           <div class="venta-title">🟣 Datos de la Venta</div>
@@ -1271,6 +1281,7 @@ function limpiarForm() {
   // Reset date to today
   const fd = document.getElementById('fFecha');
   if (fd) fd.value = new Date().toISOString().split('T')[0];
+  const ftc = document.getElementById('fTipoCliente'); if(ftc) ftc.value='';
 }
 
 
@@ -1462,6 +1473,7 @@ async function abrirContacto(row) {
   sv('eNumero',row.numero); sv('eNombre',row.nombre); sv('eEstado',row.estado);
   sv('eHorario',row.horario); sv('eSemaforo',row.semaforo);
   sv('ePauta',row.pauta); sv('eNotas',row.notas);
+  const eTCsel=document.getElementById('eTipoCliente'); if(eTCsel) eTCsel.value=row.tipo_cliente||'';
   sv('eMonto',''); sv('eFolio',''); sv('eFechaVenta','');
   // Mostrar campos de admin (fecha y vendedora)
   const eFW = document.getElementById('eFechaWrap');
@@ -1519,6 +1531,7 @@ async function guardarEdicion() {
       semaforo: sem,
       pauta:    document.getElementById('ePauta').value||null,
       notas:    document.getElementById('eNotas').value.trim()||null,
+      tipo_cliente: document.getElementById('eTipoCliente')?.value||null,
       ...(adminFecha && {fecha: adminFecha}),
       ...(adminVend  && {vendedora: adminVend}),
       ...(adminFecha && {fecha: adminFecha}),

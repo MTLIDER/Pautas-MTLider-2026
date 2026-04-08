@@ -2244,7 +2244,13 @@ function normEstado(s){
     .trim();
   // Mapeo: nombre corto DB → nombre GeoJSON normalizado
   const MAP = {
-    'df':'cdmx', 'df / cdmx':'cdmx', 'ciudad de mexico':'cdmx', 'ciudad de méxico':'cdmx',
+    // CDMX — todos sus alias apuntan a 'distrito federal' (nombre en GeoJSON)
+    'df':'distrito federal',
+    'df / cdmx':'distrito federal',
+    'cdmx':'distrito federal',
+    'ciudad de mexico':'distrito federal',
+    'ciudad de méxico':'distrito federal',
+    'distrito federal':'distrito federal',
     'coahuila':'coahuila de zaragoza',
     'michoacan':'michoacan de ocampo',
     'veracruz':'veracruz de ignacio de la llave',
@@ -2292,7 +2298,11 @@ function renderMexicoMap(allEst) {
   }
   const tooltip=document.getElementById('mapTip'), wrap=document.getElementById('mapWrap');
   const countLookup={}, maxCount=allEst.reduce((m,[,cnt])=>Math.max(m,cnt),0)||1;
-  allEst.forEach(([e,cnt])=>{const k=normEstado(e);countLookup[k]=(countLookup[k]||0)+cnt;});
+  allEst.forEach(([e,cnt])=>{
+    const k=normEstado(e);
+    countLookup[k]=(countLookup[k]||0)+cnt;
+  });
+  // Debug: console.log('countLookup keys:', Object.keys(countLookup));
   const fill=cnt=>{if(!cnt)return'#f1f5f9';const r=cnt/maxCount;if(r<.25)return'#bbf7d0';if(r<.5)return'#fde68a';if(r<.75)return'#fb923c';return'#ef4444';};
   function draw(geo) {
     const W=960,H=600;

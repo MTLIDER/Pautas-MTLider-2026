@@ -2470,18 +2470,25 @@ let _campanaActiva = null;
 let _campanaTab    = 'hoy';
 
 async function cargarCampanas() {
-  // No spinner — carga directa para evitar espacio vacío
-  const hoyEl = document.getElementById('campanaHoyContent');
   const {data} = await SB.from('campanas').select('*').eq('activa',true).order('created_at',{ascending:false}).limit(1);
   _campanaActiva = data?.[0]||null;
+  const tabHoy    = document.getElementById('campanaTabHoy');
+  const tabAgenda = document.getElementById('campanaTabAgenda');
+  const tabCrear  = document.getElementById('campanaTabCrear');
+  const btnHoy    = document.getElementById('btnCampHoy');
   if (!_campanaActiva) {
-    if (hoyEl) hoyEl.innerHTML = `<div class="card" style="text-align:center;padding:24px;color:var(--gray)">
-      <div style="font-size:36px;margin-bottom:10px">📣</div>
-      <div style="font-size:14px;font-weight:700;margin-bottom:6px">Sin campanas activas</div>
-      <div style="font-size:12px">Usa la pestana <b>➕ Nueva campana</b> para crear una</div>
-    </div>`;
+    // Sin campaña: mostrar formulario de crear directamente
+    if(tabHoy)    tabHoy.style.display    = 'none';
+    if(tabAgenda) tabAgenda.style.display = 'none';
+    if(tabCrear)  tabCrear.style.display  = 'block';
     return;
   }
+  // Con campaña activa: ir a pestaña Hoy
+  document.querySelectorAll('#campanaTabs .preset-btn').forEach(b=>b.classList.remove('active'));
+  if(btnHoy) btnHoy.classList.add('active');
+  if(tabHoy)    tabHoy.style.display    = 'block';
+  if(tabAgenda) tabAgenda.style.display = 'none';
+  if(tabCrear)  tabCrear.style.display  = 'none';
   cargarHoyCampana();
 }
 
@@ -3155,12 +3162,8 @@ let _tplActivo = null;
 let _tplEtapas = []; // [{etapa, nombre, tareas:[{tarea,dias,recurso_url,recurso_tipo,recurso_nombre}]}]
 
 function switchListaPipelines(btn) {
-  document.querySelectorAll('#listasTabs .preset-btn').forEach(b=>b.classList.remove('active'));
-  if(btn) btn.classList.add('active');
-  document.getElementById('listaCard').style.display   = 'none';
-  document.getElementById('tareasCard').style.display  = 'none';
-  document.getElementById('pipelinesCard').style.display = 'block';
-  cargarPipelineTemplates();
+  // Redirect to the Pipelines tab instead
+  switchTab('pipelines');
 }
 
 async function cargarPipelineTemplates() {

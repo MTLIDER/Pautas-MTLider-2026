@@ -3571,7 +3571,15 @@ async function cargarPipelineTemplates() {
   const TIPO_LABEL = {estandar:'🔵 Estandar',reactivacion:'🟠 Reactivacion',caliente:'🔥 Caliente',postventa:'💜 Postventa'};
   document.getElementById('tplGrid').innerHTML = data.map(t=>`
     <div class="tpl-card ${_tplActivo?.id===t.id?'selected':''}" onclick="seleccionarPipeline(${t.id})">
-      <div class="tpl-name">${t.nombre}</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div class="tpl-name" style="flex:1">${t.nombre}</div>
+        <div style="display:flex;gap:4px;margin-left:6px" onclick="event.stopPropagation()">
+          <button title="Editar nombre" onclick="editarNombrePipeline(${t.id},'${t.nombre.replace(/'/g,"\\'")}','${(t.descripcion||'').replace(/'/g,"\\'")}','${t.tipo}')"
+            style="border:none;background:none;cursor:pointer;font-size:14px;padding:2px 5px;color:var(--teal)">✏️</button>
+          <button title="Eliminar pipeline" onclick="eliminarPipeline(${t.id},'${t.nombre.replace(/'/g,"\\'")}')"
+            style="border:none;background:none;cursor:pointer;font-size:14px;padding:2px 5px;color:var(--red)">🗑️</button>
+        </div>
+      </div>
       <div class="tpl-meta">${t.descripcion||''}</div>
       <div class="tpl-badge" style="background:${TIPO_COLOR[t.tipo]||'#f1f5f9'}">${TIPO_LABEL[t.tipo]||t.tipo}</div>
       <div class="tpl-meta" style="margin-top:6px">${(t.template_tareas||[]).length} tareas configuradas</div>
@@ -3702,6 +3710,38 @@ async function guardarPipelineTareas() {
   }
   toast('✅ Pipeline guardado — '+(rows.length)+' tareas configuradas','ok');
   btn.disabled=false; btn.textContent='Guardar tareas';
+  cargarPipelineTemplates();
+}
+
+async function editarNombrePipeline(id, nombreActual, descActual, tipoActual) {
+  const nombre = prompt('Nombre del pipeline:', nombreActual);
+  if (!nombre?.trim() || nombre.trim() === nombreActual) return;
+  const desc = prompt('Descripcion:', descActual) ?? descActual;
+  const TIPOS = ['reactivacion','estandar','caliente','postventa'];
+  const tipoInput = prompt(`Tipo (${TIPOS.join(' / ')}):`, tipoActual) ?? tipoActual;
+  const tipo = TIPOS.includes(tipoInput.toLowerCase()) ? tipoInput.toLowerCase() : tipoActual;
+  const {error} = await SB.from('pipeline_templates').update({
+    nombre: nombre.trim(), descripcion: desc.trim(), tipo
+  }).eq('id', id);
+  if (error) { toast('Error: '+error.message,'err'); return; }
+  toast('✅ Pipeline actualizado','ok');
+  // If this is the active one, update editor title
+  if (_tplActivo?.id === id) {
+    document.getElementById('tplEditorTitle').textContent = `Editando: ${nombre.trim()}`;
+    _tplActivo.nombre = nombre.trim();
+  }
+  cargarPipelineTemplates();
+}
+
+async function eliminarPipeline(id, nombre) {
+  if (!confirm(`¿Eliminar el pipeline "${nombre}"?\n\nEsto eliminará también todas sus tareas configuradas.\nLos contactos existentes NO se ven afectados.`)) return;
+  // Delete tasks first
+  await SB.from('template_tareas').delete().eq('template_id', id);
+  const {error} = await SB.from('pipeline_templates').delete().eq('id', id);
+  if (error) { toast('Error: '+error.message,'err'); return; }
+  toast('🗑️ Pipeline "'+nombre+'" eliminado','ok');
+  // Close editor if this was the active pipeline
+  if (_tplActivo?.id === id) cerrarTplEditor();
   cargarPipelineTemplates();
 }
 

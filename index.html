@@ -826,6 +826,33 @@ tr:hover td{background:#f9fafb}
   </div>
 </div>
 
+  <!-- PIPELINES DE CAMPANA -->
+  <div class="tab-panel" id="panel-pipelines" style="display:none">
+    <div class="sec-title">Pipelines de Campaña</div>
+    <div class="sec-sub">Elige un pipeline para editar sus etapas y tareas, o crea uno nuevo</div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="font-size:12px;color:var(--gray)">Haz clic en un pipeline para editarlo</div>
+      <button class="btn-sm primary" onclick="crearNuevoPipeline()">＋ Nuevo pipeline</button>
+    </div>
+
+    <!-- Tarjetas de pipelines -->
+    <div class="tpl-grid" id="tplGrid"></div>
+
+    <!-- Editor de etapas -->
+    <div id="tplEditor" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 12px">
+        <div id="tplEditorTitle" style="font-size:14px;font-weight:700;color:var(--dark)"></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-sm primary" onclick="guardarPipelineTareas()">Guardar tareas</button>
+          <button class="btn-sm" onclick="cerrarTplEditor()">✕ Cerrar</button>
+        </div>
+      </div>
+      <div id="tplEtapasEditor"></div>
+      <button class="add-etapa-btn" onclick="agregarEtapaTpl()">＋ Agregar etapa</button>
+    </div>
+  </div>
+
   <!-- CAMPANAS -->
   <div class="tab-panel" id="panel-campanas" style="padding-top:8px">
     <div class="sec-title">Campanas de Reactivacion</div>
@@ -1128,7 +1155,7 @@ async function initApp() {
   const isMkt   = SESSION.rol === 'MARKETING';
 
   const tabs = isAdmin
-    ? [{id:'dashboard',l:'📊 Dashboard'},{id:'todos',l:'📋 Registros'},{id:'recompras',l:'🔁 Recompras'},{id:'registrar',l:'➕ Registrar'},{id:'asesoras',l:'👥 Asesoras'},{id:'listas',l:'⚙️ Listas'},{id:'campanas',l:'📣 Campanas'}]
+    ? [{id:'dashboard',l:'📊 Dashboard'},{id:'todos',l:'📋 Registros'},{id:'recompras',l:'🔁 Recompras'},{id:'registrar',l:'➕ Registrar'},{id:'asesoras',l:'👥 Asesoras'},{id:'listas',l:'⚙️ Listas'},{id:'campanas',l:'📣 Campanas'},{id:'pipelines',l:'🔧 Pipelines'}]
     : isMkt
     ? [{id:'dashboard',l:'📊 Dashboard'}]
     : [{id:'registrar',l:'➕ Registrar'},{id:'misregistros',l:'📋 Mis Registros'}];

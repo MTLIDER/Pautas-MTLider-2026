@@ -113,7 +113,7 @@ button,input,select,textarea{font-family:inherit}
 .tab-btn.active{color:var(--teal);border-bottom-color:var(--teal)}
 
 /* ── PANELS ─────────────────────────────────────────────────────── */
-.tab-panel{display:none;padding:20px 16px;max-width:1200px;margin:0 auto;animation:fi .2s ease}
+.tab-panel{display:none;padding:12px 16px 20px;max-width:1200px;margin:0 auto;animation:fi .2s ease}
 .tab-panel.active{display:block}
 @keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 .sec-title{font-size:17px;font-weight:800;margin-bottom:3px}
@@ -856,7 +856,7 @@ tr:hover td{background:#f9fafb}
 </div>
 
   <!-- PIPELINES DE CAMPANA -->
-  <div class="tab-panel" id="panel-pipelines" style="padding-top:12px">
+  <div class="tab-panel" id="panel-pipelines">
     <div class="sec-title" style="margin-top:0">Pipelines de Campaña</div>
     <div class="sec-sub">Elige un pipeline para editar sus etapas y tareas, o crea uno nuevo</div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -882,7 +882,7 @@ tr:hover td{background:#f9fafb}
   </div>
 
   <!-- PROSPECCION DASHBOARD -->
-  <div class="tab-panel" id="panel-prospeccion" style="padding-top:12px">
+  <div class="tab-panel" id="panel-prospeccion">
     <div class="sec-title" style="margin-top:0">🔍 Dashboard — Prospeccion</div>
     <div class="sec-sub">Estadisticas de contactos prospectados directamente por el equipo</div>
 
@@ -933,7 +933,7 @@ tr:hover td{background:#f9fafb}
   </div>
 
   <!-- CAMPANAS -->
-  <div class="tab-panel" id="panel-campanas" style="padding-top:12px">
+  <div class="tab-panel" id="panel-campanas">
     <div class="sec-title" style="margin-top:0">Campanas de Reactivacion</div>
     <div class="sec-sub">Retoma contactos historicos de forma escalonada — un dia a la vez</div>
 
@@ -2680,27 +2680,26 @@ let _campanaActiva = null;
 let _campanaTab    = 'hoy';
 
 async function cargarCampanas() {
-  iniciarSelectorPipeline(); // always reload pipeline options
-  const {data} = await SB.from('campanas').select('*').eq('activa',true).order('created_at',{ascending:false}).limit(1);
-  _campanaActiva = data?.[0]||null;
+  // Mostrar inmediatamente el form de crear (no esperar DB)
   const tabHoy    = document.getElementById('campanaTabHoy');
   const tabAgenda = document.getElementById('campanaTabAgenda');
   const tabCrear  = document.getElementById('campanaTabCrear');
   const btnHoy    = document.getElementById('btnCampHoy');
-  if (!_campanaActiva) {
-    // Sin campaña: mostrar formulario de crear directamente
-    if(tabHoy)    tabHoy.style.display    = 'none';
-    if(tabAgenda) tabAgenda.style.display = 'none';
-    if(tabCrear)  tabCrear.style.display  = 'block';
-    return;
-  }
-  // Con campaña activa: ir a pestaña Hoy
-  document.querySelectorAll('#campanaTabs .preset-btn').forEach(b=>b.classList.remove('active'));
-  if(btnHoy) btnHoy.classList.add('active');
-  if(tabHoy)    tabHoy.style.display    = 'block';
+  if(tabHoy)    tabHoy.style.display    = 'none';
   if(tabAgenda) tabAgenda.style.display = 'none';
-  if(tabCrear)  tabCrear.style.display  = 'none';
-  cargarHoyCampana();
+  if(tabCrear)  tabCrear.style.display  = 'block';
+  // Luego verificar si hay campaña activa
+  iniciarSelectorPipeline();
+  const {data} = await SB.from('campanas').select('*').eq('activa',true).order('created_at',{ascending:false}).limit(1);
+  _campanaActiva = data?.[0]||null;
+  if (_campanaActiva) {
+    document.querySelectorAll('#campanaTabs .preset-btn').forEach(b=>b.classList.remove('active'));
+    if(btnHoy) btnHoy.classList.add('active');
+    if(tabHoy)    tabHoy.style.display    = 'block';
+    if(tabAgenda) tabAgenda.style.display = 'none';
+    if(tabCrear)  tabCrear.style.display  = 'none';
+    cargarHoyCampana();
+  }
 }
 
 async function cargarHoyCampana() {
@@ -3464,7 +3463,15 @@ function autocompletarEstado(numero, estadoSelectId, showHintId) {
 // DASHBOARD PROSPECCION
 // ================================================================
 async function cargarDashboardProsp() {
-  document.getElementById('prospKpiGrid').innerHTML = '<div class="loading"><div class="sp"></div></div>';
+  // Mostrar skeleton inmediatamente
+  document.getElementById('prospKpiGrid').innerHTML = `<div class="kpi-grid">${
+    ['PROSPECTOS','CONVERTIDOS','MONTO TOTAL','CONV. RATE'].map(l=>`
+      <div class="kpi-card" style="opacity:.4">
+        <div class="kpi-label">${l}</div>
+        <div style="background:#e5e7eb;border-radius:4px;height:32px;margin:6px 0"></div>
+        <div style="background:#f3f4f6;border-radius:4px;height:10px;width:60%"></div>
+      </div>`).join('')
+  }</div>`;
   ['prospSemGrid','prospFuenteGrid','prospEstadosBar','prospVendGrid','prospSparkWrap']
     .forEach(id => { const el = document.getElementById(id); if(el) el.innerHTML=''; });
 
@@ -3668,7 +3675,13 @@ function switchListaPipelines(btn) {
 
 async function cargarPipelineTemplates() {
   const grid = document.getElementById('tplGrid');
-  if (grid) grid.innerHTML = '<div class="loading"><div class="sp"></div></div>';
+  // Mostrar skeleton inmediatamente
+  if (grid) grid.innerHTML = `
+    <div class="tpl-card" style="opacity:.4;pointer-events:none">
+      <div class="tpl-name" style="background:#e5e7eb;border-radius:4px;height:14px;width:80%;margin-bottom:8px"></div>
+      <div style="background:#f3f4f6;border-radius:4px;height:10px;width:60%;margin-bottom:10px"></div>
+      <div style="background:#dbeafe;border-radius:50px;height:20px;width:70px"></div>
+    </div>`.repeat(4);
   const {data, error} = await SB.from('pipeline_templates').select('*, template_tareas(*)').order('id');
   if (error) {
     if (grid) grid.innerHTML = `<div style="padding:20px;font-size:12px;color:var(--red)">

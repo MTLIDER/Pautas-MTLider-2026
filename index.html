@@ -2238,11 +2238,50 @@ function preset(tipo,btn) {
 // MEXICO MAP (D3)
 // ================================================================
 function normEstado(s){
-  if(!s)return'';
-  return s.toLowerCase()
+  if(!s) return '';
+  let n = s.toLowerCase()
     .replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i').replace(/ó/g,'o').replace(/ú/g,'u').replace(/ñ/g,'n')
-    .replace('df / cdmx','cdmx').replace(/^df$/,'cdmx').replace('estado de mexico','mexico')
-    .replace('nuevo leon','nuevo leon').trim();
+    .trim();
+  // Mapeo: nombre corto DB → nombre GeoJSON normalizado
+  const MAP = {
+    'df':'cdmx', 'df / cdmx':'cdmx', 'ciudad de mexico':'cdmx', 'ciudad de méxico':'cdmx',
+    'coahuila':'coahuila de zaragoza',
+    'michoacan':'michoacan de ocampo',
+    'veracruz':'veracruz de ignacio de la llave',
+    'estado de mexico':'mexico',  // GeoJSON usa "Mexico" para EdoMex
+    'edomex':'mexico',
+    'edo. de mexico':'mexico',
+    'edo mex':'mexico',
+    'baja california sur':'baja california sur',
+    'bc':'baja california',
+    'bcs':'baja california sur',
+    'nuevo leon':'nuevo leon',
+    'san luis potosi':'san luis potosi',
+    'queretaro':'queretaro de arteaga',  // algunos GeoJSON lo tienen así
+    'nayarit':'nayarit',
+    'chihuahua':'chihuahua',
+    'tamaulipas':'tamaulipas',
+    'oaxaca':'oaxaca',
+    'guerrero':'guerrero',
+    'hidalgo':'hidalgo',
+    'tlaxcala':'tlaxcala',
+    'morelos':'morelos',
+    'colima':'colima',
+    'campeche':'campeche',
+    'tabasco':'tabasco',
+    'yucatan':'yucatan',
+    'quintana roo':'quintana roo',
+    'chiapas':'chiapas',
+    'sonora':'sonora',
+    'sinaloa':'sinaloa',
+    'durango':'durango',
+    'zacatecas':'zacatecas',
+    'aguascalientes':'aguascalientes',
+    'jalisco':'jalisco',
+    'guanajuato':'guanajuato',
+    'puebla':'puebla',
+  };
+  return MAP[n] || n;
 }
 function renderMexicoMap(allEst) {
   const svgEl=document.getElementById('mexSvg');
@@ -2266,7 +2305,19 @@ function renderMexicoMap(allEst) {
       .attr('class','mex-state')
       .attr('fill',f=>{
         const raw=f.properties.name||f.properties.NAME||f.properties.nombre||f.properties.NOM_ENT||'';
-        f._label=raw; f._count=countLookup[normEstado(raw)]||0;
+        f._label=raw;
+        const normRaw = normEstado(raw);
+        // Try direct match first, then reverse-lookup (DB name → GeoJSON name)
+        let cnt = countLookup[normRaw] || 0;
+        // If not found, try matching GeoJSON name against all DB keys
+        if (!cnt) {
+          for (const [dbKey, dbCnt] of Object.entries(countLookup)) {
+            if (normEstado(dbKey) === normRaw || normRaw.includes(dbKey) || dbKey.includes(normRaw.split(' ')[0])) {
+              cnt = dbCnt; break;
+            }
+          }
+        }
+        f._count = cnt;
         return fill(f._count);
       })
       .attr('stroke','#fff').attr('stroke-width','.8')

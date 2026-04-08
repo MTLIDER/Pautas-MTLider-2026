@@ -548,6 +548,26 @@ tr:hover td{background:#f9fafb}
 }
 .row-hoy td:first-child{border-left:3px solid var(--teal)}
 .row-pend td:first-child{border-left:3px solid var(--amber)}
+
+/* ── PIPELINE TEMPLATE EDITOR ─────────────────────────────── */
+.tpl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:16px}
+.tpl-card{background:#fff;border-radius:var(--r);border:2px solid var(--border);padding:14px;cursor:pointer;transition:.15s;position:relative}
+.tpl-card:hover{border-color:var(--teal)}
+.tpl-card.selected{border-color:var(--teal);background:#f0f9ff}
+.tpl-card.selected::after{content:'✓';position:absolute;top:8px;right:10px;color:var(--teal);font-weight:800;font-size:16px}
+.tpl-name{font-size:13px;font-weight:800;color:var(--dark);margin-bottom:4px}
+.tpl-meta{font-size:11px;color:var(--gray)}
+.tpl-badge{display:inline-block;padding:2px 8px;border-radius:50px;font-size:10px;font-weight:700;margin-top:6px}
+.etapa-editor{background:var(--bg);border-radius:var(--r);border:1px solid var(--border);margin-bottom:10px;overflow:hidden}
+.etapa-editor-hdr{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fff;border-bottom:1px solid var(--border);cursor:pointer}
+.etapa-editor-body{padding:10px 14px}
+.task-mini-row{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--ltgray)}
+.task-mini-row:last-child{border:none}
+.task-mini-dia{width:50px;padding:3px 6px;border:1.5px solid var(--border);border-radius:6px;font-size:11px;text-align:center}
+.task-mini-input{flex:1;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px}
+.task-mini-del{border:none;background:none;color:var(--red);cursor:pointer;font-size:15px;padding:2px 6px}
+.add-task-btn{font-size:11px;color:var(--teal);font-weight:700;cursor:pointer;border:none;background:none;padding:6px 0}
+.add-etapa-btn{font-size:12px;border:1.5px dashed var(--border);background:#fff;color:var(--teal);font-weight:700;cursor:pointer;border-radius:8px;padding:8px 16px;width:100%;margin-top:6px}
 </style>
 </head>
 <body>
@@ -788,6 +808,7 @@ tr:hover td{background:#f9fafb}
       <button class="preset-btn active" onclick="switchLista('PAUTA',this)">Pauta</button>
       <button class="preset-btn" onclick="switchLista('ETAPA_NOMBRE',this)">Nombres de Etapas</button>
       <button class="preset-btn" onclick="switchListaTareas(this)">Tareas del Pipeline</button>
+      <button class="preset-btn" onclick="switchListaPipelines(this)">Pipelines de Campana</button>
     </div>
     <div class="card" id="listaCard">
       <div class="card-title" id="listaTitulo">Opciones de Pauta</div>
@@ -3095,6 +3116,158 @@ async function cargarBitacora() {
     <div style="margin-top:8px;font-size:10px;color:var(--gray);text-align:right">
       Mostrando ${data.length} eventos · Los eventos se ordenan del mas reciente al mas antiguo
     </div>`;
+}
+
+
+// ================================================================
+// PIPELINES DE CAMPANA — Editor visual
+// ================================================================
+let _tplActivo = null;
+let _tplEtapas = []; // [{etapa, nombre, tareas:[{tarea,dias,recurso_url,recurso_tipo,recurso_nombre}]}]
+
+function switchListaPipelines(btn) {
+  document.querySelectorAll('#listasTabs .preset-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  document.getElementById('listaCard').style.display   = 'none';
+  document.getElementById('tareasCard').style.display  = 'none';
+  document.getElementById('pipelinesCard').style.display = 'block';
+  cargarPipelineTemplates();
+}
+
+async function cargarPipelineTemplates() {
+  const {data, error} = await SB.from('pipeline_templates').select('*, template_tareas(*)').order('id');
+  if (error||!data) return;
+  const TIPO_COLOR = {estandar:'#dbeafe',reactivacion:'#fff7ed',caliente:'#fee2e2',postventa:'#ede9fe'};
+  const TIPO_LABEL = {estandar:'🔵 Estandar',reactivacion:'🟠 Reactivacion',caliente:'🔥 Caliente',postventa:'💜 Postventa'};
+  document.getElementById('tplGrid').innerHTML = data.map(t=>`
+    <div class="tpl-card ${_tplActivo?.id===t.id?'selected':''}" onclick="seleccionarPipeline(${t.id})">
+      <div class="tpl-name">${t.nombre}</div>
+      <div class="tpl-meta">${t.descripcion||''}</div>
+      <div class="tpl-badge" style="background:${TIPO_COLOR[t.tipo]||'#f1f5f9'}">${TIPO_LABEL[t.tipo]||t.tipo}</div>
+      <div class="tpl-meta" style="margin-top:6px">${(t.template_tareas||[]).length} tareas configuradas</div>
+    </div>`).join('');
+}
+
+async function seleccionarPipeline(id) {
+  const {data, error} = await SB.from('pipeline_templates')
+    .select('*, template_tareas(*)')
+    .eq('id', id).single();
+  if (error||!data) return;
+  _tplActivo = data;
+  document.getElementById('tplEditorTitle').textContent = `Editando: ${data.nombre}`;
+  document.getElementById('tplEditor').style.display = 'block';
+  // Group tasks by etapa
+  const byEtapa = {};
+  (data.template_tareas||[]).forEach(t=>{
+    if(!byEtapa[t.etapa]) byEtapa[t.etapa] = {nombre:t.etapa_nombre, tareas:[]};
+    byEtapa[t.etapa].tareas.push(t);
+  });
+  _tplEtapas = Object.entries(byEtapa).map(([e,v])=>({
+    etapa: parseInt(e), nombre: v.nombre,
+    tareas: v.tareas.sort((a,b)=>a.orden-b.orden)
+  })).sort((a,b)=>a.etapa-b.etapa);
+  renderTplEditor();
+  // Highlight selected card
+  document.querySelectorAll('.tpl-card').forEach(c=>c.classList.remove('selected'));
+  event?.currentTarget?.classList.add('selected');
+}
+
+function renderTplEditor() {
+  const ETAPA_COLORS = ['#00a0e9','#0080c0','#8b5cf6','#16a34a','#ea580c','#dc2626','#f59e0b','#ec4899'];
+  document.getElementById('tplEtapasEditor').innerHTML = _tplEtapas.map((et,ei)=>`
+    <div class="etapa-editor">
+      <div class="etapa-editor-hdr">
+        <div style="width:28px;height:28px;border-radius:7px;background:${ETAPA_COLORS[ei%ETAPA_COLORS.length]};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0">E${et.etapa}</div>
+        <input type="text" value="${et.nombre}" data-etapa="${et.etapa}" data-field="nombre"
+          oninput="actualizarNombreEtapa(${ei},this.value)"
+          style="flex:1;border:none;background:none;font-size:13px;font-weight:700;color:var(--dark);outline:none"
+          placeholder="Nombre de la etapa...">
+        <button onclick="eliminarEtapaTpl(${ei})" style="border:none;background:none;cursor:pointer;color:var(--red);font-size:13px;padding:2px 6px">✕</button>
+      </div>
+      <div class="etapa-editor-body">
+        ${et.tareas.map((t,ti)=>`
+          <div class="task-mini-row">
+            <span style="font-size:10px;color:var(--gray);width:28px">Día</span>
+            <input type="number" min="0" max="365" value="${t.dias_espera||0}" class="task-mini-dia"
+              oninput="actualizarTareaTpl(${ei},${ti},'dias_espera',parseInt(this.value)||0)">
+            <input type="text" value="${t.tarea}" class="task-mini-input" placeholder="Nombre de la tarea..."
+              oninput="actualizarTareaTpl(${ei},${ti},'tarea',this.value)">
+            <button class="task-mini-del" onclick="eliminarTareaTpl(${ei},${ti})">✕</button>
+          </div>`).join('')}
+        <button class="add-task-btn" onclick="agregarTareaTpl(${ei})">+ Agregar tarea</button>
+      </div>
+    </div>`).join('');
+}
+
+function actualizarNombreEtapa(ei, val) { _tplEtapas[ei].nombre = val; }
+function actualizarTareaTpl(ei, ti, field, val) { _tplEtapas[ei].tareas[ti][field] = val; }
+function eliminarTareaTpl(ei, ti) { _tplEtapas[ei].tareas.splice(ti,1); renderTplEditor(); }
+function eliminarEtapaTpl(ei) {
+  if(!confirm('¿Eliminar esta etapa y todas sus tareas?')) return;
+  _tplEtapas.splice(ei,1);
+  // Renumber etapas
+  _tplEtapas.forEach((et,i)=>et.etapa=i+1);
+  renderTplEditor();
+}
+function agregarTareaTpl(ei) {
+  _tplEtapas[ei].tareas.push({tarea:'Nueva tarea',dias_espera:0,orden:_tplEtapas[ei].tareas.length+1});
+  renderTplEditor();
+}
+function agregarEtapaTpl() {
+  const nextN = _tplEtapas.length + 1;
+  _tplEtapas.push({etapa:nextN, nombre:'Etapa '+nextN, tareas:[]});
+  renderTplEditor();
+}
+function cerrarTplEditor() {
+  _tplActivo = null; _tplEtapas = [];
+  document.getElementById('tplEditor').style.display = 'none';
+  document.querySelectorAll('.tpl-card').forEach(c=>c.classList.remove('selected'));
+}
+
+async function guardarPipelineTareas() {
+  if (!_tplActivo) return;
+  const btn = event.target; btn.disabled=true; btn.textContent='Guardando...';
+  // Delete existing tasks for this template
+  await SB.from('template_tareas').delete().eq('template_id', _tplActivo.id);
+  // Insert new tasks
+  const rows = [];
+  _tplEtapas.forEach(et=>{
+    et.tareas.forEach((t,ti)=>{
+      if(!t.tarea?.trim()) return;
+      rows.push({
+        template_id: _tplActivo.id,
+        etapa: et.etapa,
+        etapa_nombre: et.nombre,
+        tarea: t.tarea,
+        orden: ti+1,
+        dias_espera: t.dias_espera||0,
+        recurso_url: t.recurso_url||null,
+        recurso_tipo: t.recurso_tipo||null,
+        recurso_nombre: t.recurso_nombre||null,
+        activo: true,
+      });
+    });
+  });
+  if (rows.length) {
+    const {error} = await SB.from('template_tareas').insert(rows);
+    if (error) { toast('Error: '+error.message,'err'); btn.disabled=false; btn.textContent='Guardar tareas'; return; }
+  }
+  toast('✅ Pipeline guardado — '+(rows.length)+' tareas configuradas','ok');
+  btn.disabled=false; btn.textContent='Guardar tareas';
+  cargarPipelineTemplates();
+}
+
+async function crearNuevoPipeline() {
+  const nombre = prompt('Nombre del nuevo pipeline:');
+  if (!nombre?.trim()) return;
+  const tipo = 'reactivacion'; // default
+  const {data, error} = await SB.from('pipeline_templates').insert({
+    nombre: nombre.trim(), descripcion: '', tipo, color:'00a0e9', activo:true
+  }).select().single();
+  if (error) { toast('Error: '+error.message,'err'); return; }
+  toast('✅ Pipeline creado. Ahora configura sus etapas y tareas.','ok');
+  await cargarPipelineTemplates();
+  seleccionarPipeline(data.id);
 }
 
 </script>

@@ -2059,6 +2059,33 @@ function kpi(label, value, sub, color) {
 
 function renderDash(d, desde, hasta, vend) {
   if (!d) return;
+  // Normalize field names — handle both old and new get_kpis format
+  d.semaforo    = d.semaforo    || d.semaforos   || {BAJO:0,MEDIO:0,ALTO:0,VENTA:0,DESCARTADO:0};
+  d.monto_total = d.monto_total || d.monto        || 0;
+  d.recompradores = d.recompradores || d.recompras || 0;
+  d.topEstados  = d.topEstados  || (d.estados||[]).map(e=>({estado:e.estado, count:e.cnt||e.count||0}));
+  d.horaCount   = d.horaCount   || {};
+  if (d.heatmap && !Object.keys(d.horaCount).length) {
+    (d.heatmap||[]).forEach(h => { d.horaCount[String(h.h)] = (d.horaCount[String(h.h)]||0) + (h.v||0); });
+  }
+  if (d.diasSemana && Array.isArray(d.diasSemana)) {
+    const dowObj = {};
+    d.diasSemana.forEach(x => { dowObj[String(x.dow)] = x.cnt||x.count||0; });
+    d.diasSemana = dowObj;
+  }
+  if (d.tendencia && Array.isArray(d.tendencia) && d.tendencia[0] && d.tendencia[0].cnt !== undefined) {
+    d.tendencia = d.tendencia.map(t => ({fecha: t.fecha, count: t.cnt||0, ...t}));
+  }
+  if (d.byVend && Array.isArray(d.byVend)) {
+    d.byVend = d.byVend.map(v => ({
+      nombre: v.nombre || v.vend || v.vendedora || v.key || '—',
+      key:    v.nombre || v.vend || v.vendedora || v.key || '—',
+      total:  v.total  || 0,
+      ventas: v.ventas || 0,
+      monto:  v.monto  || 0,
+      ...v
+    }));
+  }
   const sem = d.semaforo||{BAJO:0,MEDIO:0,ALTO:0,VENTA:0,DESCARTADO:0};
   const st  = Object.values(sem).reduce((a,b)=>a+b,0);
   let sub = (d.total||0).toLocaleString()+' contactos';

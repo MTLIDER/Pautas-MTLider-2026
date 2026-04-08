@@ -568,6 +568,21 @@ tr:hover td{background:#f9fafb}
 .task-mini-del{border:none;background:none;color:var(--red);cursor:pointer;font-size:15px;padding:2px 6px}
 .add-task-btn{font-size:11px;color:var(--teal);font-weight:700;cursor:pointer;border:none;background:none;padding:6px 0}
 .add-etapa-btn{font-size:12px;border:1.5px dashed var(--border);background:#fff;color:var(--teal);font-weight:700;cursor:pointer;border-radius:8px;padding:8px 16px;width:100%;margin-top:6px}
+
+/* ── DUPLICADO ALERT ──────────────────────────────────────── */
+.dup-alert{
+  background:#fff7ed;border:2px solid #f97316;border-radius:10px;
+  padding:12px 14px;font-size:12px
+}
+.dup-alert-title{font-weight:800;color:#c2410c;margin-bottom:6px;font-size:13px}
+.dup-alert-row{display:flex;gap:6px;margin-bottom:4px;align-items:baseline}
+.dup-alert-label{color:var(--gray);font-size:11px;width:80px;flex-shrink:0}
+.dup-alert-val{font-weight:700;color:var(--dark)}
+.dup-alert-asesora{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;
+  background:#fee2e2;color:#991b1b;border-radius:50px;font-size:11px;font-weight:800}
+.dup-btn-ver{font-size:11px;font-weight:700;color:var(--teal);border:1.5px solid var(--teal);
+  background:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;margin-top:8px}
+.dup-btn-ver:hover{background:var(--teal);color:#fff}
 </style>
 </head>
 <body>
@@ -632,8 +647,9 @@ tr:hover td{background:#f9fafb}
         <div class="field">
           <label>Numero de telefono *</label>
           <input type="tel" id="fNumero" placeholder="ej. 5551234567"
-            oninput="autocompletarEstado(this.value,'fEstado','ladaHint')">
+            oninput="onNumeroInput(this.value)">
           <div id="ladaHint" style="margin-top:4px;min-height:16px"></div>
+          <div id="duplicadoAlert" style="display:none;margin-top:8px"></div>
         </div>
         <div class="field">
           <label>Fecha de contacto *</label>
@@ -666,6 +682,19 @@ tr:hover td{background:#f9fafb}
             <option value="DISTRIBUIDOR">🚚 Distribuidor regional</option>
           </select>
           <div style="font-size:10px;color:var(--gray);margin-top:3px">Identifica si el cliente tiene un negocio o compra para uso propio</div>
+        </div>
+        <div class="field">
+          <label>Canal de origen</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">
+            <label id="lbl-origen-pauta" onclick="setOrigen('pauta')" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:2px solid var(--teal);border-radius:10px;cursor:pointer;background:var(--teal);color:#fff;font-size:12px;font-weight:700">
+              <span style="font-size:16px">📣</span> Pauta / Anuncio
+            </label>
+            <label id="lbl-origen-prospeccion" onclick="setOrigen('prospeccion')" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:2px solid var(--border);border-radius:10px;cursor:pointer;background:#fff;color:var(--gray);font-size:12px;font-weight:700">
+              <span style="font-size:16px">🔍</span> Prospección
+            </label>
+          </div>
+          <input type="hidden" id="fOrigen" value="pauta">
+          <div id="origenPautaRow" style="margin-top:8px"></div>
         </div>
         <div class="field full"><label>Notas</label><textarea id="fNotas" placeholder="Informacion extra, observaciones..."></textarea></div>
         <div class="venta-sec full" id="ventaF">
@@ -849,6 +878,57 @@ tr:hover td{background:#f9fafb}
       </div>
       <div id="tplEtapasEditor"></div>
       <button class="add-etapa-btn" onclick="agregarEtapaTpl()">＋ Agregar etapa</button>
+    </div>
+  </div>
+
+  <!-- PROSPECCION DASHBOARD -->
+  <div class="tab-panel" id="panel-prospeccion">
+    <div class="sec-title">🔍 Dashboard — Prospeccion</div>
+    <div class="sec-sub">Estadisticas de contactos prospectados directamente por el equipo</div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px">
+      <select id="prospVend" class="f-sel" onchange="cargarDashboardProsp()">
+        <option value="">Todo el equipo</option>
+      </select>
+      <input type="date" id="prospDesde" class="f-sel" onchange="cargarDashboardProsp()">
+      <input type="date" id="prospHasta" class="f-sel" onchange="cargarDashboardProsp()">
+      <button class="btn-sm" onclick="cargarDashboardProsp()">↻ Actualizar</button>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid" id="prospKpiGrid">
+      <div class="loading"><div class="sp"></div></div>
+    </div>
+
+    <!-- Semaforo -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-title">Estado de prospectos</div>
+      <div class="sem-grid" id="prospSemGrid"></div>
+    </div>
+
+    <!-- Grid: Fuente + Top Estados -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+      <div class="card">
+        <div class="card-title">Por fuente de prospeccion</div>
+        <div id="prospFuenteGrid" style="margin-top:8px"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Top estados</div>
+        <div id="prospEstadosBar"></div>
+      </div>
+    </div>
+
+    <!-- Por asesora -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-title">Por asesora</div>
+      <div class="card-sub">Prospectos registrados y convertidos</div>
+      <div id="prospVendGrid" style="margin-top:12px"></div>
+    </div>
+
+    <!-- Tendencia -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-title">Tendencia ultimos 30 dias</div>
+      <div id="prospSparkWrap" style="margin-top:8px"></div>
     </div>
   </div>
 
@@ -1153,9 +1233,9 @@ async function initApp() {
   const isMkt   = SESSION.rol === 'MARKETING';
 
   const tabs = isAdmin
-    ? [{id:'dashboard',l:'📊 Dashboard'},{id:'todos',l:'📋 Registros'},{id:'recompras',l:'🔁 Recompras'},{id:'registrar',l:'➕ Registrar'},{id:'asesoras',l:'👥 Asesoras'},{id:'listas',l:'⚙️ Listas'},{id:'campanas',l:'📣 Campanas'},{id:'pipelines',l:'🔧 Pipelines'}]
+    ? [{id:'dashboard',l:'📣 Pautas'},{id:'prospeccion',l:'🔍 Prospeccion'},{id:'todos',l:'📋 Registros'},{id:'recompras',l:'🔁 Recompras'},{id:'registrar',l:'➕ Registrar'},{id:'asesoras',l:'👥 Asesoras'},{id:'listas',l:'⚙️ Listas'},{id:'campanas',l:'📣 Campanas'},{id:'pipelines',l:'🔧 Pipelines'}]
     : isMkt
-    ? [{id:'dashboard',l:'📊 Dashboard'}]
+    ? [{id:'dashboard',l:'📣 Pautas'},{id:'prospeccion',l:'🔍 Prospeccion'}]
     : [{id:'registrar',l:'➕ Registrar'},{id:'misregistros',l:'📋 Mis Registros'}];
 
   const nav = document.getElementById('tabsNav');
@@ -1330,6 +1410,9 @@ function limpiarForm() {
   const fd = document.getElementById('fFecha');
   if (fd) fd.value = new Date().toISOString().split('T')[0];
   const ftc = document.getElementById('fTipoCliente'); if(ftc) ftc.value='';
+  setOrigen('pauta');
+  _ignorarDup = false;
+  ocultarDuplicado();
 }
 
 
@@ -1917,6 +2000,27 @@ async function cargarRecompras() {
 // ================================================================
 // DASHBOARD
 // ================================================================
+let _dashOrigen = 'todo'; // todo | pauta | prospeccion
+
+function setDashOrigen(val, btn) {
+  _dashOrigen = val;
+  document.querySelectorAll('[id^="btnOrigen"]').forEach(b => {
+    b.style.background = '#fff'; b.style.color = 'var(--gray)';
+  });
+  if (btn) { btn.style.background = 'var(--teal)'; btn.style.color = '#fff'; }
+  const lbl = document.getElementById('dashOrigenLabel');
+  if (lbl) {
+    if (val === 'todo') { lbl.style.display = 'none'; }
+    else {
+      lbl.style.display = 'block';
+      lbl.textContent = val === 'pauta'
+        ? '📣 Viendo solo contactos de Pauta / Anuncios'
+        : '🔍 Viendo solo contactos de Prospección directa';
+    }
+  }
+  cargarDashboard();
+}
+
 async function cargarDashboard() {
   document.getElementById('kpiGrid').innerHTML='<div class="loading"><div class="sp"></div></div>';
   ['semGrid','estBar','heatGrid','dowGrid','sparkWrap','vendGrid'].forEach(id=>{const e=document.getElementById(id);if(e)e.innerHTML='';});
@@ -1924,7 +2028,8 @@ async function cargarDashboard() {
   const hasta = document.getElementById('dashHasta')?.value||null;
   const vend  = document.getElementById('dashVend')?.value||null;
   const { data, error } = await SB.rpc('get_kpis',{
-    p_desde: desde||null, p_hasta: hasta||null, p_vend: vend||null
+    p_desde: desde||null, p_hasta: hasta||null, p_vend: vend||null,
+    p_origen: 'pauta'
   });
   if (error) { document.getElementById('kpiGrid').innerHTML=`<div class="loading">Error: ${error.message}</div>`; return; }
   // Todo calculado en PostgreSQL — sin query extra
@@ -2821,6 +2926,151 @@ function renderTimeline(checks, parent) {
 }
 
 // ================================================================
+// ORIGEN DEL CONTACTO
+// ================================================================
+function setOrigen(val) {
+  document.getElementById('fOrigen').value = val;
+  const isPauta = val === 'pauta';
+  const lblP = document.getElementById('lbl-origen-pauta');
+  const lblR = document.getElementById('lbl-origen-prospeccion');
+  if (lblP) {
+    lblP.style.background     = isPauta ? 'var(--teal)' : '#fff';
+    lblP.style.color          = isPauta ? '#fff' : 'var(--gray)';
+    lblP.style.borderColor    = isPauta ? 'var(--teal)' : 'var(--border)';
+  }
+  if (lblR) {
+    lblR.style.background     = !isPauta ? 'var(--teal)' : '#fff';
+    lblR.style.color          = !isPauta ? '#fff' : 'var(--gray)';
+    lblR.style.borderColor    = !isPauta ? 'var(--teal)' : 'var(--border)';
+  }
+  // Show/hide pauta selector
+  const pautaRow = document.getElementById('origenPautaRow');
+  const pautaField = document.getElementById('fPautaWrap');
+  if (pautaRow) {
+    if (isPauta) {
+      pautaRow.innerHTML = '';
+      if (pautaField) pautaField.style.display = 'block';
+    } else {
+      pautaRow.innerHTML = '<div style="font-size:11px;color:var(--gray)">🔍 Prospección directa — sin pauta asociada</div>';
+      if (pautaField) pautaField.style.display = 'none';
+    }
+  }
+}
+
+// ================================================================
+// DETECCION DE NUMERO DUPLICADO
+// ================================================================
+let _dupTimeout = null;
+
+function onNumeroInput(val) {
+  autocompletarEstado(val, 'fEstado', 'ladaHint');
+  clearTimeout(_dupTimeout);
+  const clean = val.replace(/\D/g,'');
+  if (clean.length < 8) {
+    ocultarDuplicado();
+    return;
+  }
+  _dupTimeout = setTimeout(() => verificarDuplicado(clean), 600);
+}
+
+function ocultarDuplicado() {
+  const el = document.getElementById('duplicadoAlert');
+  if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+  const btn = document.getElementById('btnRegistrar');
+  if (btn) btn.disabled = false;
+}
+
+async function verificarDuplicado(numero) {
+  const { data } = await SB.from('contactos')
+    .select('id, folio, numero, nombre, estado, semaforo, vendedora, fecha, notas')
+    .eq('numero', numero)
+    .limit(1);
+
+  if (!data || !data.length) { ocultarDuplicado(); return; }
+
+  const dup = data[0];
+  const el  = document.getElementById('duplicadoAlert');
+  if (!el) return;
+
+  const semIco = {BAJO:'🔵',MEDIO:'🟡',ALTO:'🟢',VENTA:'🟣',DESCARTADO:'🔴'};
+
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="dup-alert">
+      <div class="dup-alert-title">⚠️ Este número ya está registrado</div>
+      <div class="dup-alert-row">
+        <span class="dup-alert-label">Folio</span>
+        <span class="dup-alert-val">${dup.folio||'—'}</span>
+      </div>
+      <div class="dup-alert-row">
+        <span class="dup-alert-label">Nombre</span>
+        <span class="dup-alert-val">${dup.nombre||'Sin nombre'}</span>
+      </div>
+      <div class="dup-alert-row">
+        <span class="dup-alert-label">Estado</span>
+        <span class="dup-alert-val">${dup.estado||'—'}</span>
+      </div>
+      <div class="dup-alert-row">
+        <span class="dup-alert-label">Semaforo</span>
+        <span class="dup-alert-val">${semIco[dup.semaforo]||''} ${dup.semaforo}</span>
+      </div>
+      <div class="dup-alert-row">
+        <span class="dup-alert-label">Fecha</span>
+        <span class="dup-alert-val">${fmtFecha(dup.fecha)}</span>
+      </div>
+      <div class="dup-alert-row">
+        <span class="dup-alert-label">Asesora</span>
+        <span class="dup-alert-asesora">👩 ${dup.vendedora}</span>
+      </div>
+      ${dup.notas ? `<div class="dup-alert-row">
+        <span class="dup-alert-label">Notas</span>
+        <span class="dup-alert-val" style="color:var(--gray);font-weight:400">${dup.notas}</span>
+      </div>` : ''}
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="dup-btn-ver" onclick="abrirContactoDesdeRegistro('${dup.id}','${dup.folio}')">
+          🔍 Ver contacto existente
+        </button>
+        ${SESSION.rol === 'ADMIN' ? `
+        <button class="dup-btn-ver" style="border-color:var(--amber);color:var(--amber)" 
+          onclick="ignorarDuplicadoYRegistrar()">
+          ⚠️ Registrar de todas formas
+        </button>` : ''}
+      </div>
+      <div style="font-size:10px;color:var(--gray);margin-top:6px">
+        Verifica con <b>${dup.vendedora}</b> antes de crear un registro duplicado.
+      </div>
+    </div>`;
+
+  // Block register button (unless admin overrides)
+  if (SESSION.rol !== 'ADMIN') {
+    const btn = document.getElementById('btnRegistrar');
+    if (btn) btn.disabled = true;
+  }
+}
+
+async function abrirContactoDesdeRegistro(id, folio) {
+  const { data } = await SB.from('contactos').select('*').eq('id', id).single();
+  if (data) {
+    // Switch to registros tab and open the contact
+    switchTab('todos');
+    setTimeout(() => abrirContacto(data), 400);
+  }
+}
+
+let _ignorarDup = false;
+function ignorarDuplicadoYRegistrar() {
+  _ignorarDup = true;
+  const el = document.getElementById('duplicadoAlert');
+  if (el) {
+    el.innerHTML = `<div style="background:#fef9c3;border:1.5px solid #fbbf24;border-radius:8px;padding:8px 12px;font-size:11px;color:#92400e;font-weight:700">
+      ⚠️ Modo admin: se registrará aunque ya existe un contacto con este número.
+    </div>`;
+  }
+  const btn = document.getElementById('btnRegistrar');
+  if (btn) btn.disabled = false;
+}
+
+// ================================================================
 // DETECCION AUTOMATICA DE LADA — Mexico
 // ================================================================
 const LADAS_MX = {
@@ -3102,6 +3352,122 @@ function autocompletarEstado(numero, estadoSelectId, showHintId) {
   }
 }
 
+
+// ================================================================
+// DASHBOARD PROSPECCION
+// ================================================================
+async function cargarDashboardProsp() {
+  document.getElementById('prospKpiGrid').innerHTML = '<div class="loading"><div class="sp"></div></div>';
+  ['prospSemGrid','prospFuenteGrid','prospEstadosBar','prospVendGrid','prospSparkWrap']
+    .forEach(id => { const el = document.getElementById(id); if(el) el.innerHTML=''; });
+
+  const vend  = document.getElementById('prospVend')?.value  || null;
+  const desde = document.getElementById('prospDesde')?.value || null;
+  const hasta = document.getElementById('prospHasta')?.value || null;
+
+  // Populate vendedoras in filter
+  const vSel = document.getElementById('prospVend');
+  if (vSel && vSel.options.length <= 1 && vendedoras.length) {
+    vSel.innerHTML = '<option value="">Todo el equipo</option>' +
+      vendedoras.map(v=>`<option value="${v.usuario}">${v.nombre||v.usuario}</option>`).join('');
+  }
+
+  const { data, error } = await SB.rpc('get_kpis', {
+    p_desde: desde||null, p_hasta: hasta||null,
+    p_vend: vend||null, p_origen: 'prospeccion'
+  });
+
+  if (error || !data) {
+    document.getElementById('prospKpiGrid').innerHTML =
+      `<div style="padding:20px;color:var(--red);font-size:12px">Error: ${error?.message||'Sin datos'}</div>`;
+    return;
+  }
+
+  // KPI Cards
+  const kpis = [
+    {label:'PROSPECTOS',     val: data.total,    sub:'Total registrados',      color:'#00a0e9'},
+    {label:'CONVERTIDOS',    val: data.ventas,   sub:'Cerraron compra',        color:'#8b5cf6'},
+    {label:'MONTO TOTAL',    val: '$'+(data.monto||0).toLocaleString('es-MX'), sub:'Suma de ventas', color:'#16a34a'},
+    {label:'CONV. RATE',     val: data.conv+'%', sub:'Prospectos → venta',     color:'#ea580c'},
+  ];
+  document.getElementById('prospKpiGrid').innerHTML = `<div class="kpi-grid">${
+    kpis.map(k=>`<div class="kpi-card">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-val" style="color:${k.color}">${k.val}</div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>`).join('')
+  }</div>`;
+
+  // Semaforo
+  const SEMS = {BAJO:'🔵',MEDIO:'🟡',ALTO:'🟢',VENTA:'🟣',DESCARTADO:'🔴'};
+  const semData = data.semaforos || {};
+  document.getElementById('prospSemGrid').innerHTML = `<div class="sem-grid">${
+    Object.entries(SEMS).map(([s,ico])=>`<div class="sem-item">
+      <div class="sem-ico">${ico}</div>
+      <div class="sem-count">${semData[s]||0}</div>
+      <div class="sem-label">${s}</div>
+    </div>`).join('')
+  }</div>`;
+
+  // Por fuente (pauta field holds the source for prospeccion)
+  const { data: fuenteData } = await SB.from('contactos')
+    .select('pauta')
+    .eq('origen','prospeccion')
+    .not('pauta','is',null);
+  if (fuenteData) {
+    const fCounts = {};
+    fuenteData.forEach(r => {
+      const f = r.pauta || 'Sin especificar';
+      fCounts[f] = (fCounts[f]||0) + 1;
+    });
+    const maxF = Math.max(...Object.values(fCounts), 1);
+    document.getElementById('prospFuenteGrid').innerHTML = Object.entries(fCounts)
+      .sort((a,b)=>b[1]-a[1]).slice(0,6)
+      .map(([f,n])=>`<div style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
+          <span>${f}</span><b>${n}</b>
+        </div>
+        <div style="height:6px;background:var(--ltgray);border-radius:3px">
+          <div style="height:6px;background:var(--teal);border-radius:3px;width:${Math.round(n/maxF*100)}%"></div>
+        </div>
+      </div>`).join('');
+  }
+
+  // Top estados
+  const estados = data.estados || [];
+  const maxE = Math.max(...estados.map(e=>e.cnt), 1);
+  document.getElementById('prospEstadosBar').innerHTML = estados.slice(0,8).map(e=>`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <div style="width:90px;font-size:11px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.estado||'—'}</div>
+      <div style="flex:1;height:8px;background:var(--ltgray);border-radius:4px">
+        <div style="height:8px;background:var(--teal);border-radius:4px;width:${Math.round(e.cnt/maxE*100)}%"></div>
+      </div>
+      <div style="font-size:11px;font-weight:700;width:28px">${e.cnt}</div>
+    </div>`).join('');
+
+  // Por asesora
+  const byVend = data.byVend || [];
+  document.getElementById('prospVendGrid').innerHTML = `<div class="tw"><table>
+    <thead><tr><th>Asesora</th><th>Prospectos</th><th>Convertidos</th><th>Conv %</th></tr></thead>
+    <tbody>${byVend.map(v=>`<tr>
+      <td style="font-weight:700">${v.vend}</td>
+      <td>${v.total}</td>
+      <td>${v.ventas}</td>
+      <td>${v.total>0?Math.round(v.ventas/v.total*100):0}%</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+
+  // Tendencia
+  const tend = data.tendencia || [];
+  if (tend.length) {
+    const maxT = Math.max(...tend.map(t=>t.cnt), 1);
+    document.getElementById('prospSparkWrap').innerHTML = `<div style="display:flex;align-items:flex-end;gap:3px;height:60px">
+      ${tend.map(t=>`<div title="${t.fecha}: ${t.cnt}" style="flex:1;min-width:4px;
+        height:${Math.max(4,Math.round(t.cnt/maxT*56))}px;
+        background:var(--teal);border-radius:2px;opacity:.8"></div>`).join('')}
+    </div>`;
+  }
+}
 
 // ================================================================
 // BITACORA DE CAMBIOS

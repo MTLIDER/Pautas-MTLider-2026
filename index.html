@@ -892,9 +892,8 @@ tr:hover td{background:#f9fafb}
           <div class="field full"><label>Descripcion</label><input type="text" id="cnDesc" placeholder="ej. Retomar prospectos de diciembre que no compraron"></div>
           <div class="field"><label>Fecha de inicio de la campana *</label><input type="date" id="cnInicio"><div style="font-size:10px;color:var(--gray);margin-top:4px">Desde que dia empezar a activar contactos</div></div>
           <div class="field"><label>Pipeline de reactivacion</label>
-            <select id="cnTemplate" style="padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;width:100%">
-              <option value="2">🟠 Reactivacion — 2 etapas, proceso rapido</option>
-              <option value="1">🔵 Estandar — 4 etapas completas</option>
+            <select id="cnTemplate" style="padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;width:100%" onchange="cargarOpcionesPipeline()">
+              <option value="">Cargando...</option>
             </select>
             <div style="font-size:10px;color:var(--gray);margin-top:4px">El pipeline de reactivacion es mas corto — si el cliente muestra interes, se puede promover a cualquier otro pipeline</div>
           </div>
@@ -2603,6 +2602,22 @@ function siguienteDiaHabil(fecha, diasHabiles) {
     tries++;
   }
   return d.toISOString().split('T')[0];
+}
+
+async function cargarOpcionesPipeline() {
+  // Already loaded — just update preview
+  previewCampana();
+}
+
+async function iniciarSelectorPipeline() {
+  const sel = document.getElementById('cnTemplate');
+  if (!sel) return;
+  const {data} = await SB.from('pipeline_templates').select('id,nombre,tipo,descripcion').eq('activo',true).order('id');
+  if (!data || !data.length) return;
+  const TIPO_ICO = {estandar:'🔵',reactivacion:'🟠',caliente:'🔥',postventa:'💜'};
+  sel.innerHTML = data.map(t =>
+    `<option value="${t.id}">${TIPO_ICO[t.tipo]||'⚙️'} ${t.nombre}${t.descripcion?' — '+t.descripcion:''}</option>`
+  ).join('');
 }
 
 function previewCampana() {

@@ -832,8 +832,8 @@ tr:hover td{background:#f9fafb}
     <div class="sec-sub">Elige un pipeline para editar sus etapas y tareas, o crea uno nuevo</div>
 
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-      <div style="font-size:12px;color:var(--gray)">Haz clic en un pipeline para editarlo</div>
-      <button class="btn-sm primary" onclick="crearNuevoPipeline()">＋ Nuevo pipeline</button>
+      <div style="font-size:12px;color:var(--gray)">Haz clic en una tarjeta para editar sus etapas y tareas</div>
+      <button class="btn-sm primary" style="font-size:13px;padding:8px 18px" onclick="crearNuevoPipeline()">＋ Nuevo pipeline</button>
     </div>
 
     <!-- Tarjetas de pipelines -->
@@ -854,7 +854,7 @@ tr:hover td{background:#f9fafb}
   </div>
 
   <!-- CAMPANAS -->
-  <div class="tab-panel" id="panel-campanas" style="padding-top:8px">
+  <div class="tab-panel" id="panel-campanas">
     <div class="sec-title">Campanas de Reactivacion</div>
     <div class="sec-sub">Retoma contactos historicos de forma escalonada — un dia a la vez</div>
 
@@ -863,14 +863,14 @@ tr:hover td{background:#f9fafb}
 
     <!-- Tabs campana -->
     <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap" id="campanaTabs">
-      <button class="preset-btn active" onclick="switchCampanaTab('hoy',this)">📅 Hoy</button>
+      <button class="preset-btn" onclick="switchCampanaTab('hoy',this)" id="btnCampHoy">📅 Hoy</button>
       <button class="preset-btn" onclick="switchCampanaTab('agenda',this)">🗓 Agenda</button>
-      <button class="preset-btn" onclick="switchCampanaTab('crear',this)">➕ Nueva campana</button>
+      <button class="preset-btn active" onclick="switchCampanaTab('crear',this)">➕ Nueva campana</button>
     </div>
 
     <!-- HOY -->
-    <div id="campanaTabHoy" style="padding-top:0">
-      <div id="campanaHoyContent" style="min-height:0;display:block"></div>
+    <div id="campanaTabHoy" style="display:none">
+      <div id="campanaHoyContent"></div>
     </div>
 
     <!-- AGENDA -->
@@ -883,7 +883,7 @@ tr:hover td{background:#f9fafb}
     </div>
 
     <!-- CREAR NUEVA CAMPANA -->
-    <div id="campanaTabCrear" style="display:none">
+    <div id="campanaTabCrear">
       <div class="card">
         <div class="card-title">Crear campana de reactivacion</div>
         <div class="card-sub">Define el rango de contactos y la fecha de inicio</div>
@@ -2470,15 +2470,15 @@ let _campanaActiva = null;
 let _campanaTab    = 'hoy';
 
 async function cargarCampanas() {
+  // No spinner — carga directa para evitar espacio vacío
   const hoyEl = document.getElementById('campanaHoyContent');
-  if (hoyEl) hoyEl.innerHTML = '<div class="loading"><div class="sp"></div></div>';
   const {data} = await SB.from('campanas').select('*').eq('activa',true).order('created_at',{ascending:false}).limit(1);
   _campanaActiva = data?.[0]||null;
   if (!_campanaActiva) {
-    if (hoyEl) hoyEl.innerHTML = `<div style="text-align:center;padding:32px;color:var(--gray)">
-      <div style="font-size:40px;margin-bottom:10px">📣</div>
+    if (hoyEl) hoyEl.innerHTML = `<div class="card" style="text-align:center;padding:24px;color:var(--gray)">
+      <div style="font-size:36px;margin-bottom:10px">📣</div>
       <div style="font-size:14px;font-weight:700;margin-bottom:6px">Sin campanas activas</div>
-      <div style="font-size:12px">Crea una campana en la pestana "Nueva campana"</div>
+      <div style="font-size:12px">Usa la pestana <b>➕ Nueva campana</b> para crear una</div>
     </div>`;
     return;
   }

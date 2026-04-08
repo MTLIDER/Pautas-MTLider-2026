@@ -827,10 +827,9 @@ tr:hover td{background:#f9fafb}
 </div>
 
   <!-- PIPELINES DE CAMPANA -->
-  <div class="tab-panel" id="panel-pipelines">
-    <div class="sec-title">Pipelines de Campaña</div>
+  <div class="tab-panel" id="panel-pipelines" style="padding-top:12px">
+    <div class="sec-title" style="margin-top:0">Pipelines de Campaña</div>
     <div class="sec-sub">Elige un pipeline para editar sus etapas y tareas, o crea uno nuevo</div>
-
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
       <div style="font-size:12px;color:var(--gray)">Haz clic en una tarjeta para editar sus etapas y tareas</div>
       <button class="btn-sm primary" style="font-size:13px;padding:8px 18px" onclick="crearNuevoPipeline()">＋ Nuevo pipeline</button>
@@ -854,8 +853,8 @@ tr:hover td{background:#f9fafb}
   </div>
 
   <!-- CAMPANAS -->
-  <div class="tab-panel" id="panel-campanas">
-    <div class="sec-title">Campanas de Reactivacion</div>
+  <div class="tab-panel" id="panel-campanas" style="padding-top:12px">
+    <div class="sec-title" style="margin-top:0">Campanas de Reactivacion</div>
     <div class="sec-sub">Retoma contactos historicos de forma escalonada — un dia a la vez</div>
 
     <!-- Alerta de HOY -->
@@ -3324,12 +3323,18 @@ async function guardarPipelineTareas() {
 async function crearNuevoPipeline() {
   const nombre = prompt('Nombre del nuevo pipeline:');
   if (!nombre?.trim()) return;
-  const tipo = 'reactivacion'; // default
+  const desc  = prompt('Descripcion breve (opcional):') || '';
+  const tipos = ['reactivacion','estandar','caliente','postventa'];
+  const tipo  = prompt('Tipo (reactivacion / estandar / caliente / postventa):') || 'reactivacion';
+  const tipoVal = tipos.includes(tipo.toLowerCase()) ? tipo.toLowerCase() : 'reactivacion';
+  // Use MAX(id)+1 to avoid sequence issues
+  const {data: maxData} = await SB.from('pipeline_templates').select('id').order('id',{ascending:false}).limit(1);
+  const nextId = ((maxData?.[0]?.id) || 0) + 1;
   const {data, error} = await SB.from('pipeline_templates').insert({
-    nombre: nombre.trim(), descripcion: '', tipo, color:'00a0e9', activo:true
+    id: nextId, nombre: nombre.trim(), descripcion: desc.trim(), tipo: tipoVal, color:'00a0e9', activo:true
   }).select().single();
   if (error) { toast('Error: '+error.message,'err'); return; }
-  toast('✅ Pipeline creado. Ahora configura sus etapas y tareas.','ok');
+  toast('✅ Pipeline "'+nombre.trim()+'" creado. Agrega etapas y tareas.','ok');
   await cargarPipelineTemplates();
   seleccionarPipeline(data.id);
 }

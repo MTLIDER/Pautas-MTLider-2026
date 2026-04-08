@@ -827,7 +827,7 @@ tr:hover td{background:#f9fafb}
 </div>
 
   <!-- PIPELINES DE CAMPANA -->
-  <div class="tab-panel" id="panel-pipelines" style="display:none">
+  <div class="tab-panel" id="panel-pipelines">
     <div class="sec-title">Pipelines de Campaña</div>
     <div class="sec-sub">Elige un pipeline para editar sus etapas y tareas, o crea uno nuevo</div>
 
@@ -1235,6 +1235,8 @@ function switchTab(id) {
   if (id==='recompras')    cargarRecompras();
   if (id==='asesoras')     cargarAsesoras();
   if (id==='listas')       { listaActiva='PAUTA'; cargarListaActual(); }
+  if (id==='campanas')     cargarCampanas();
+  if (id==='pipelines')    cargarPipelineTemplates();
 }
 
 // ================================================================

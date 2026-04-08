@@ -2468,6 +2468,7 @@ let _campanaActiva = null;
 let _campanaTab    = 'hoy';
 
 async function cargarCampanas() {
+  iniciarSelectorPipeline(); // always reload pipeline options
   const {data} = await SB.from('campanas').select('*').eq('activa',true).order('created_at',{ascending:false}).limit(1);
   _campanaActiva = data?.[0]||null;
   const tabHoy    = document.getElementById('campanaTabHoy');
@@ -3249,13 +3250,31 @@ function renderTplEditor() {
       </div>
       <div class="etapa-editor-body">
         ${et.tareas.map((t,ti)=>`
-          <div class="task-mini-row">
-            <span style="font-size:10px;color:var(--gray);width:28px">Día</span>
-            <input type="number" min="0" max="365" value="${t.dias_espera||0}" class="task-mini-dia"
-              oninput="actualizarTareaTpl(${ei},${ti},'dias_espera',parseInt(this.value)||0)">
-            <input type="text" value="${t.tarea}" class="task-mini-input" placeholder="Nombre de la tarea..."
-              oninput="actualizarTareaTpl(${ei},${ti},'tarea',this.value)">
-            <button class="task-mini-del" onclick="eliminarTareaTpl(${ei},${ti})">✕</button>
+          <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px">
+            <div class="task-mini-row" style="border:none;padding-bottom:6px">
+              <span style="font-size:10px;color:var(--gray);width:28px">Día</span>
+              <input type="number" min="0" max="365" value="${t.dias_espera||0}" class="task-mini-dia"
+                oninput="actualizarTareaTpl(${ei},${ti},'dias_espera',parseInt(this.value)||0)">
+              <input type="text" value="${t.tarea}" class="task-mini-input" placeholder="Nombre de la tarea..."
+                oninput="actualizarTareaTpl(${ei},${ti},'tarea',this.value)">
+              <button class="task-mini-del" onclick="eliminarTareaTpl(${ei},${ti})">✕</button>
+            </div>
+            <div style="display:grid;grid-template-columns:130px 1fr 1fr;gap:6px;margin-top:4px">
+              <select style="padding:4px 6px;border:1.5px solid var(--border);border-radius:6px;font-size:11px"
+                onchange="actualizarTareaTpl(${ei},${ti},'recurso_tipo',this.value)">
+                <option value="" ${!t.recurso_tipo?'selected':''}>Sin recurso</option>
+                <option value="video"     ${t.recurso_tipo==='video'?'selected':''}>🎬 Video</option>
+                <option value="documento" ${t.recurso_tipo==='documento'?'selected':''}>📄 Documento</option>
+                <option value="enlace"    ${t.recurso_tipo==='enlace'?'selected':''}>🔗 Enlace</option>
+                <option value="imagen"    ${t.recurso_tipo==='imagen'?'selected':''}>🖼️ Imagen</option>
+              </select>
+              <input type="url" value="${t.recurso_url||''}" placeholder="URL del recurso..."
+                style="padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:11px"
+                oninput="actualizarTareaTpl(${ei},${ti},'recurso_url',this.value)">
+              <input type="text" value="${t.recurso_nombre||''}" placeholder="Nombre del boton..."
+                style="padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:11px"
+                oninput="actualizarTareaTpl(${ei},${ti},'recurso_nombre',this.value)">
+            </div>
           </div>`).join('')}
         <button class="add-task-btn" onclick="agregarTareaTpl(${ei})">+ Agregar tarea</button>
       </div>

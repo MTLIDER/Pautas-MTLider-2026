@@ -2030,15 +2030,8 @@ async function cargarDashboard() {
   // Try with p_origen first (requires updated SQL), fallback to without it
   let data, error;
   ({ data, error } = await SB.rpc('get_kpis',{
-    p_desde: desde||null, p_hasta: hasta||null, p_vend: vend||null,
-    p_origen: 'pauta'
+    p_desde: desde||null, p_hasta: hasta||null, p_vend: vend||null
   }));
-  if (error) {
-    // Fallback: DB may not have p_origen yet — load all data
-    ({ data, error } = await SB.rpc('get_kpis',{
-      p_desde: desde||null, p_hasta: hasta||null, p_vend: vend||null
-    }));
-  }
   if (error) {
     document.getElementById('kpiGrid').innerHTML=`<div style="padding:20px;color:var(--red);font-size:12px">
       <b>Error cargando dashboard:</b> ${error.message}<br><br>
@@ -2064,6 +2057,8 @@ function renderDash(d, desde, hasta, vend) {
   d.monto_total = d.monto_total || d.monto        || 0;
   d.recompradores = d.recompradores || d.recompras || 0;
   d.topEstados  = d.topEstados  || (d.estados||[]).map(e=>({estado:e.estado, count:e.cnt||e.count||0}));
+  // allEstados for map — use same data (SQL limit controls this)
+  d.allEstados  = d.allEstados  || d.topEstados;
   d.horaCount   = d.horaCount   || {};
   if (d.heatmap && !Object.keys(d.horaCount).length) {
     (d.heatmap||[]).forEach(h => { d.horaCount[String(h.h)] = (d.horaCount[String(h.h)]||0) + (h.v||0); });
@@ -2073,18 +2068,27 @@ function renderDash(d, desde, hasta, vend) {
     d.diasSemana.forEach(x => { dowObj[String(x.dow)] = x.cnt||x.count||0; });
     d.diasSemana = dowObj;
   }
-  if (d.tendencia && Array.isArray(d.tendencia) && d.tendencia[0] && d.tendencia[0].cnt !== undefined) {
-    d.tendencia = d.tendencia.map(t => ({fecha: t.fecha, count: t.cnt||0, ...t}));
+  if (d.tendencia && Array.isArray(d.tendencia)) {
+    d.tendencia = d.tendencia.map(t => ({
+      fecha: (t.fecha || t.dia || '').toString().substring(0,10),
+      count: parseInt(t.count || t.cnt || 0),
+    })).filter(t => t.fecha && t.fecha.length >= 8)
+      .sort((a,b) => a.fecha > b.fecha ? 1 : -1);
   }
   if (d.byVend && Array.isArray(d.byVend)) {
-    d.byVend = d.byVend.map(v => ({
-      nombre: v.nombre || v.vend || v.vendedora || v.key || '—',
-      key:    v.nombre || v.vend || v.vendedora || v.key || '—',
-      total:  v.total  || 0,
-      ventas: v.ventas || 0,
-      monto:  v.monto  || 0,
-      ...v
-    }));
+    d.byVend = d.byVend.map(v => {
+      const usuario = v.nombre || v.vend || v.vendedora || v.key || '—';
+      // Try to find real name from vendedoras list
+      const perfil = vendedoras.find(p => p.usuario === usuario);
+      return {
+        nombre: perfil?.nombre || usuario,
+        key:    usuario,
+        total:  v.total  || 0,
+        ventas: v.ventas || 0,
+        monto:  v.monto  || 0,
+        ...v
+      };
+    });
   }
   const sem = d.semaforo||{BAJO:0,MEDIO:0,ALTO:0,VENTA:0,DESCARTADO:0};
   const st  = Object.values(sem).reduce((a,b)=>a+b,0);
@@ -2154,14 +2158,15 @@ function renderDash(d, desde, hasta, vend) {
     ? `<div style="display:flex;align-items:flex-end;gap:3px;width:100%;height:100px">` +
       tend.map((t,i)=>{
         const h    = Math.max(4,Math.round(t.count/maxS*72));
-        const _dt  = new Date((t.full||'2026-'+t.fecha)+'T00:00:00');
-        const dow  = _dt.getDay();
+        // t.fecha is already a full date string like "2026-03-09"
+        const _dt  = t.fecha ? new Date(t.fecha.toString()+'T00:00:00') : new Date();
+        const dow  = isNaN(_dt.getTime()) ? 1 : _dt.getDay();
         const showF= i===0||i===tend.length-1||i%5===0;
         return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100px">
           <div style="font-size:8px;font-weight:800;color:var(--teal);margin-bottom:2px;min-height:12px">${t.count||''}</div>
           <div style="width:100%;height:${h}px;background:var(--teal);border-radius:2px 2px 0 0;opacity:${.4+.6*t.count/maxS}" title="${t.fecha}: ${t.count}"></div>
           <div style="font-size:8px;font-weight:700;color:${dowC[dow]};margin-top:3px">${DIAS[dow]}</div>
-          <div style="font-size:7px;color:var(--gray);text-align:center">${showF?t.fecha:''}</div>
+          <div style="font-size:7px;color:var(--gray);text-align:center">${showF&&t.fecha ? t.fecha.toString().substring(5) : ''}</div>
         </div>`;
       }).join('') + '</div>'
     : '<div style="padding:16px;font-size:12px;color:var(--gray);text-align:center">Cargando tendencia...</div>';

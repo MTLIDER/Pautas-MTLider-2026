@@ -2027,12 +2027,25 @@ async function cargarDashboard() {
   const desde = document.getElementById('dashDesde')?.value||null;
   const hasta = document.getElementById('dashHasta')?.value||null;
   const vend  = document.getElementById('dashVend')?.value||null;
-  const { data, error } = await SB.rpc('get_kpis',{
+  // Try with p_origen first (requires updated SQL), fallback to without it
+  let data, error;
+  ({ data, error } = await SB.rpc('get_kpis',{
     p_desde: desde||null, p_hasta: hasta||null, p_vend: vend||null,
     p_origen: 'pauta'
-  });
-  if (error) { document.getElementById('kpiGrid').innerHTML=`<div class="loading">Error: ${error.message}</div>`; return; }
-  // Todo calculado en PostgreSQL — sin query extra
+  }));
+  if (error) {
+    // Fallback: DB may not have p_origen yet — load all data
+    ({ data, error } = await SB.rpc('get_kpis',{
+      p_desde: desde||null, p_hasta: hasta||null, p_vend: vend||null
+    }));
+  }
+  if (error) {
+    document.getElementById('kpiGrid').innerHTML=`<div style="padding:20px;color:var(--red);font-size:12px">
+      <b>Error cargando dashboard:</b> ${error.message}<br><br>
+      Verifica que la funcion get_kpis exista en Supabase.
+    </div>`;
+    return;
+  }
   renderDash(data, desde, hasta, vend);
 }
 

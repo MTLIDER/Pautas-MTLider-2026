@@ -2121,14 +2121,14 @@ async function cargarRecompras() {
   // Traer ventas + nombre/asesora desde contactos para tener nombre completo
   const [ventasRes, contactosRes] = await Promise.all([
     SB.from('ventas').select('id,numero,nombre,vendedora,monto,fecha_venta').order('numero'),
-    SB.from('contactos').select('numero,nombre,vendedora').not('nombre','is',null)
+    SB.from('contactos').select('numero,nombre')
   ]);
   const data = ventasRes.data;
   if (!data) { el.innerHTML='<div class="loading">Error cargando datos.</div>'; return; }
   // Build nombre lookup from contactos (more reliable than ventas.nombre)
   const nombreLookup = {};
   (contactosRes.data||[]).forEach(ct => {
-    if (ct.nombre && ct.nombre.trim()) nombreLookup[ct.numero] = ct.nombre.trim();
+    const nm = (ct.nombre||'').trim(); if (nm && nm !== '—') nombreLookup[ct.numero] = nm;
   });
   const cl={};
   data.forEach(v=>{

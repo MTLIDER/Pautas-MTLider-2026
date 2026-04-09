@@ -1992,12 +1992,24 @@ document.getElementById('ventaModal').addEventListener('click',function(e){if(e.
 async function cargarRecompras() {
   const el=document.getElementById('recompContent');
   el.innerHTML='<div class="loading"><div class="sp"></div></div>';
-  const { data } = await SB.from('ventas').select('numero,nombre,vendedora,monto,fecha_venta').order('numero');
+  // Traer ventas + nombre/asesora desde contactos para tener nombre completo
+  const [ventasRes, contactosRes] = await Promise.all([
+    SB.from('ventas').select('id,numero,nombre,vendedora,monto,fecha_venta').order('numero'),
+    SB.from('contactos').select('numero,nombre,vendedora').not('nombre','is',null)
+  ]);
+  const data = ventasRes.data;
   if (!data) { el.innerHTML='<div class="loading">Error cargando datos.</div>'; return; }
+  // Build nombre lookup from contactos (more reliable than ventas.nombre)
+  const nombreLookup = {};
+  (contactosRes.data||[]).forEach(ct => {
+    if (ct.nombre && ct.nombre.trim()) nombreLookup[ct.numero] = ct.nombre.trim();
+  });
   const cl={};
   data.forEach(v=>{
     const n=v.numero;
-    if(!cl[n]) cl[n]={numero:n,nombre:v.nombre,vendedora:v.vendedora,compras:0,montoTotal:0,ultima:''};
+    const nombre = nombreLookup[n] || v.nombre || '—';
+    if(!cl[n]) cl[n]={numero:n,nombre,vendedora:v.vendedora,compras:0,montoTotal:0,ultima:''};
+    else if(cl[n].nombre==='—' && nombre!=='—') cl[n].nombre=nombre;
     cl[n].compras++;
     cl[n].montoTotal+=parseFloat(v.monto)||0;
     if(v.fecha_venta>cl[n].ultima) cl[n].ultima=v.fecha_venta;

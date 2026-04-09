@@ -706,6 +706,9 @@ tr:hover td{background:#f9fafb}
             <label id="lbl-origen-prospeccion" onclick="setOrigen('prospeccion')" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:2px solid var(--border);border-radius:10px;cursor:pointer;background:#fff;color:var(--gray);font-size:12px;font-weight:700">
               <span style="font-size:16px">🔍</span> Prospección
             </label>
+            <label id="lbl-origen-reactivacion" onclick="setOrigen('reactivacion')" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:2px solid var(--border);border-radius:10px;cursor:pointer;background:#fff;color:var(--gray);font-size:12px;font-weight:700">
+              <span style="font-size:16px">🔄</span> Reactivacion
+            </label>
           </div>
           <input type="hidden" id="fOrigen" value="pauta">
           <div id="origenPautaRow" style="margin-top:8px"></div>
@@ -958,6 +961,46 @@ tr:hover td{background:#f9fafb}
     </div>
   </div>
 
+  <!-- REACTIVACION DASHBOARD -->
+  <div class="tab-panel" id="panel-reactivacion" style="padding-top:12px">
+    <div class="sec-title" style="margin-top:0">🔄 Dashboard — Reactivacion</div>
+    <div class="sec-sub">Clientes previos que se estan reactivando — independiente de Pautas y Prospeccion</div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px">
+      <select id="reactVend" class="f-sel" onchange="cargarDashboardReact()">
+        <option value="">Todo el equipo</option>
+      </select>
+      <input type="date" id="reactDesde" class="f-sel" onchange="cargarDashboardReact()">
+      <input type="date" id="reactHasta" class="f-sel" onchange="cargarDashboardReact()">
+      <button class="btn-sm" onclick="cargarDashboardReact()">↻ Actualizar</button>
+    </div>
+
+    <div class="kpi-grid" id="reactKpiGrid">
+      <div class="loading"><div class="sp"></div></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-title">Estado de contactos reactivados</div>
+      <div class="sem-grid" id="reactSemGrid"></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+      <div class="card">
+        <div class="card-title">Top estados</div>
+        <div id="reactEstadosBar"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Tendencia ultimos 30 dias</div>
+        <div id="reactSparkWrap" style="margin-top:8px"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-title">Por asesora</div>
+      <div class="vend-grid" id="reactVendGrid" style="margin-top:12px"></div>
+    </div>
+  </div>
+
   <!-- BITACORA -->
   <div class="tab-panel" id="panel-bitacora" style="padding-top:12px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -1037,6 +1080,25 @@ tr:hover td{background:#f9fafb}
           <div class="field full"><label>Nombre de la campana *</label><input type="text" id="cnNombre" placeholder="ej. Reactivacion Diciembre 2025"></div>
           <div class="field full"><label>Descripcion</label><input type="text" id="cnDesc" placeholder="ej. Retomar prospectos de diciembre que no compraron"></div>
           <div class="field"><label>Fecha de inicio de la campana *</label><input type="date" id="cnInicio"><div style="font-size:10px;color:var(--gray);margin-top:4px">Desde que dia empezar a activar contactos</div></div>
+          <div class="field">
+            <label>Canal de la campaña *</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:6px">
+              <label id="lbl-camp-pauta" onclick="setCampOrigen('pauta')"
+                style="display:flex;align-items:center;gap:6px;padding:8px 10px;border:2px solid var(--teal);border-radius:9px;cursor:pointer;background:var(--teal);color:#fff;font-size:11px;font-weight:700">
+                <span>📣</span> Pautas
+              </label>
+              <label id="lbl-camp-prospeccion" onclick="setCampOrigen('prospeccion')"
+                style="display:flex;align-items:center;gap:6px;padding:8px 10px;border:2px solid var(--border);border-radius:9px;cursor:pointer;background:#fff;color:var(--gray);font-size:11px;font-weight:700">
+                <span>🔍</span> Prospeccion
+              </label>
+              <label id="lbl-camp-reactivacion" onclick="setCampOrigen('reactivacion')"
+                style="display:flex;align-items:center;gap:6px;padding:8px 10px;border:2px solid var(--border);border-radius:9px;cursor:pointer;background:#fff;color:var(--gray);font-size:11px;font-weight:700">
+                <span>🔄</span> Reactivacion
+              </label>
+            </div>
+            <input type="hidden" id="cnOrigen" value="pauta">
+            <div style="font-size:10px;color:var(--gray);margin-top:4px">Los contactos de esta campaña se clasificarán bajo el canal seleccionado</div>
+          </div>
           <div class="field"><label>Pipeline de reactivacion</label>
             <select id="cnTemplate" style="padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;width:100%" onchange="cargarOpcionesPipeline()">
               <option value="">Cargando...</option>
@@ -1302,9 +1364,9 @@ async function initApp() {
   const isMkt   = SESSION.rol === 'MARKETING';
 
   const tabs = isAdmin
-    ? [{id:'dashboard',l:'📣 Pautas'},{id:'prospeccion',l:'🔍 Prospeccion'},{id:'bitacora',l:'📋 Bitacora'},{id:'todos',l:'📋 Registros'},{id:'recompras',l:'🔁 Recompras'},{id:'registrar',l:'➕ Registrar'},{id:'asesoras',l:'👥 Asesoras'},{id:'listas',l:'⚙️ Listas'},{id:'campanas',l:'📣 Campanas'},{id:'pipelines',l:'🔧 Pipelines'}]
+    ? [{id:'dashboard',l:'📣 Pautas'},{id:'prospeccion',l:'🔍 Prospeccion'},{id:'reactivacion',l:'🔄 Reactivacion'},{id:'bitacora',l:'📋 Bitacora'},{id:'todos',l:'📋 Registros'},{id:'recompras',l:'🔁 Recompras'},{id:'registrar',l:'➕ Registrar'},{id:'asesoras',l:'👥 Asesoras'},{id:'listas',l:'⚙️ Listas'},{id:'campanas',l:'📣 Campanas'},{id:'pipelines',l:'🔧 Pipelines'}]
     : isMkt
-    ? [{id:'dashboard',l:'📣 Pautas'},{id:'prospeccion',l:'🔍 Prospeccion'},{id:'bitacora',l:'📋 Bitacora'}]
+    ? [{id:'dashboard',l:'📣 Pautas'},{id:'prospeccion',l:'🔍 Prospeccion'},{id:'reactivacion',l:'🔄 Reactivacion'},{id:'bitacora',l:'📋 Bitacora'}]
     : [{id:'registrar',l:'➕ Registrar'},{id:'misregistros',l:'📋 Mis Registros'}];
 
   const nav = document.getElementById('tabsNav');
@@ -2949,6 +3011,22 @@ function siguienteDiaHabil(fecha, diasHabiles) {
   return d.toISOString().split('T')[0];
 }
 
+function setCampOrigen(val) {
+  document.getElementById('cnOrigen').value = val;
+  const btns = {
+    'pauta':        document.getElementById('lbl-camp-pauta'),
+    'prospeccion':  document.getElementById('lbl-camp-prospeccion'),
+    'reactivacion': document.getElementById('lbl-camp-reactivacion'),
+  };
+  Object.entries(btns).forEach(([key, lbl]) => {
+    if (!lbl) return;
+    const active = key === val;
+    lbl.style.background  = active ? 'var(--teal)' : '#fff';
+    lbl.style.color       = active ? '#fff' : 'var(--gray)';
+    lbl.style.borderColor = active ? 'var(--teal)' : 'var(--border)';
+  });
+}
+
 async function cargarOpcionesPipeline() {
   // Already loaded — just update preview
   previewCampana();
@@ -3027,14 +3105,19 @@ async function crearCampana() {
   if(!confirm(`Crear campana "${nombre}"?`))return;
   const diasHab = getDiasSeleccionados();
   if (!diasHab.length) { toast('Selecciona al menos un dia habil','err'); return; }
+  const campOrigen = document.getElementById('cnOrigen')?.value || 'pauta';
   const {data,error}=await SB.rpc('crear_campana',{
     p_nombre:nombre,p_descripcion:desc||null,p_inicio:inicio,
     p_origen_desde:desde,p_origen_hasta:hasta,p_semaforos:sems,
-    p_dias_habiles:diasHab,p_usuario:SESSION.usuario
+    p_dias_habiles:diasHab,p_usuario:SESSION.usuario,
+    p_origen_contactos:campOrigen
   });
   if(error){toast('Error: '+error.message,'err');return;}
   if(!data?.ok){toast('Error al crear','err');return;}
-  toast(`✅ Campana creada — ${data.total_contactos} contactos`,'ok');
+  const origenLabel = {'pauta':'📣 Pautas','prospeccion':'🔍 Prospeccion','reactivacion':'🔄 Reactivacion'};
+  toast(`✅ Campaña creada — ${data.total_contactos} contactos (${origenLabel[campOrigen]||campOrigen})`,'ok');
+  document.getElementById('cnOrigen').value = 'pauta';
+  setCampOrigen('pauta');
   _campanaActiva=null;
   await cargarCampanas();
   switchCampanaTab('hoy',document.querySelector('#campanaTabs .preset-btn'));
@@ -3170,30 +3253,29 @@ function renderTimeline(checks, parent) {
 // ================================================================
 function setOrigen(val) {
   document.getElementById('fOrigen').value = val;
-  const isPauta = val === 'pauta';
-  const lblP = document.getElementById('lbl-origen-pauta');
-  const lblR = document.getElementById('lbl-origen-prospeccion');
-  if (lblP) {
-    lblP.style.background     = isPauta ? 'var(--teal)' : '#fff';
-    lblP.style.color          = isPauta ? '#fff' : 'var(--gray)';
-    lblP.style.borderColor    = isPauta ? 'var(--teal)' : 'var(--border)';
-  }
-  if (lblR) {
-    lblR.style.background     = !isPauta ? 'var(--teal)' : '#fff';
-    lblR.style.color          = !isPauta ? '#fff' : 'var(--gray)';
-    lblR.style.borderColor    = !isPauta ? 'var(--teal)' : 'var(--border)';
-  }
+  // Reset all buttons
+  const btns = {
+    'pauta':       document.getElementById('lbl-origen-pauta'),
+    'prospeccion': document.getElementById('lbl-origen-prospeccion'),
+    'reactivacion':document.getElementById('lbl-origen-reactivacion'),
+  };
+  Object.entries(btns).forEach(([key, lbl]) => {
+    if (!lbl) return;
+    const active = key === val;
+    lbl.style.background  = active ? 'var(--teal)' : '#fff';
+    lbl.style.color       = active ? '#fff' : 'var(--gray)';
+    lbl.style.borderColor = active ? 'var(--teal)' : 'var(--border)';
+  });
   // Show/hide pauta selector
-  const pautaRow = document.getElementById('origenPautaRow');
   const pautaField = document.getElementById('fPautaWrap');
+  const pautaRow   = document.getElementById('origenPautaRow');
+  const isPauta = val === 'pauta';
+  if (pautaField) pautaField.style.display = isPauta ? 'block' : 'none';
   if (pautaRow) {
-    if (isPauta) {
-      pautaRow.innerHTML = '';
-      if (pautaField) pautaField.style.display = 'block';
-    } else {
-      pautaRow.innerHTML = '<div style="font-size:11px;color:var(--gray)">🔍 Prospección directa — sin pauta asociada</div>';
-      if (pautaField) pautaField.style.display = 'none';
-    }
+    pautaRow.innerHTML = isPauta ? '' :
+      val === 'prospeccion'
+        ? '<div style="font-size:11px;color:var(--gray)">🔍 Prospección directa — sin pauta</div>'
+        : '<div style="font-size:11px;color:var(--gray)">🔄 Reactivacion — cliente previo sin registro en CRM</div>';
   }
 }
 
@@ -3839,6 +3921,118 @@ function imprimirReporte() {
   win.document.write('</body></html>');
   win.document.close();
   setTimeout(() => win.print(), 600);
+}
+
+// ================================================================
+// DASHBOARD REACTIVACION
+// ================================================================
+async function cargarDashboardReact() {
+  document.getElementById('reactKpiGrid').innerHTML = '<div class="loading"><div class="sp"></div></div>';
+  ['reactSemGrid','reactEstadosBar','reactSparkWrap','reactVendGrid']
+    .forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='';});
+
+  const vend  = document.getElementById('reactVend')?.value  || null;
+  const desde = document.getElementById('reactDesde')?.value || null;
+  const hasta = document.getElementById('reactHasta')?.value || null;
+
+  // Populate vendedoras
+  const vSel = document.getElementById('reactVend');
+  if (vSel && vSel.options.length <= 1 && vendedoras.length) {
+    vSel.innerHTML = '<option value="">Todo el equipo</option>' +
+      vendedoras.map(v=>`<option value="${v.usuario}">${v.nombre||v.usuario}</option>`).join('');
+  }
+
+  const {data, error} = await SB.rpc('get_kpis', {
+    p_desde: desde||null, p_hasta: hasta||null,
+    p_vend: vend||null, p_origen: 'reactivacion'
+  });
+
+  if (error || !data) {
+    document.getElementById('reactKpiGrid').innerHTML =
+      `<div style="padding:24px;text-align:center;color:var(--gray)">
+        <div style="font-size:32px;margin-bottom:10px">🔄</div>
+        <div style="font-weight:700;font-size:14px;margin-bottom:6px">Sin datos de reactivación aún</div>
+        <div style="font-size:12px">Al registrar contactos con origen <b>Reactivacion</b> apareceran aqui.</div>
+        ${error ? '<div style="font-size:11px;color:var(--red);margin-top:8px">'+error.message+'</div>' : ''}
+      </div>`;
+    return;
+  }
+
+  // KPIs
+  const sem = data.semaforo||{};
+  const st  = Object.values(sem).reduce((a,b)=>a+b,0);
+  const conv = st > 0 ? ((sem.VENTA||0)/st*100).toFixed(1) : '0.0';
+  document.getElementById('reactKpiGrid').innerHTML = `<div class="kpi-grid">
+    ${kpi('REACTIVADOS',   (data.total||0).toLocaleString(), 'Total registrados',   'var(--teal)')}
+    ${kpi('CONVERTIDOS',   sem.VENTA||0,                     'Cerraron compra',     'var(--purple)')}
+    ${kpi('MONTO TOTAL',   fmtMonto(data.monto_total||0),    'Suma de ventas',      'var(--green)')}
+    ${kpi('CONV. RATE',    conv+'%',                          'Reactivados → venta', '#ea580c')}
+  </div>`;
+
+  // Semaforo
+  const sdef=[['BAJO','🔵','#3b82f6'],['MEDIO','🟡','var(--amber)'],['ALTO','🟢','var(--green)'],['VENTA','🟣','var(--purple)'],['DESCARTADO','🔴','var(--red)']];
+  document.getElementById('reactSemGrid').innerHTML = sdef.map(([k,ico,col])=>`
+    <div class="sem-card" style="border-top:3px solid ${col}">
+      <div class="sem-count" style="color:${col}">${(sem[k]||0).toLocaleString()}</div>
+      <div class="sem-label">${ico} ${k}</div>
+      <div class="sem-pct">${st>0?((sem[k]||0)/st*100).toFixed(1):'0'}%</div>
+    </div>`).join('');
+
+  // Top estados
+  const estados = data.topEstados||[];
+  const maxE = estados[0]?.count||1;
+  document.getElementById('reactEstadosBar').innerHTML = estados.slice(0,8).map(e=>`
+    <div class="bar-item">
+      <div class="bar-name" title="${e.estado}">${e.estado||'—'}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(e.count/maxE*100)}%;background:var(--teal)"></div></div>
+      <div class="bar-val">${e.count}</div>
+    </div>`).join('');
+
+  // Tendencia
+  const tend = data.tendencia||[];
+  if (tend.length) {
+    const maxT = Math.max(...tend.map(t=>t.count),1);
+    document.getElementById('reactSparkWrap').innerHTML = `<div style="display:flex;align-items:flex-end;gap:2px;height:60px">
+      ${tend.map(t=>`<div title="${t.fecha}: ${t.count}" style="flex:1;min-width:3px;
+        height:${Math.max(3,Math.round(t.count/maxT*56))}px;
+        background:var(--teal);border-radius:2px;opacity:.8"></div>`).join('')}
+    </div>
+    <div style="font-size:10px;color:var(--gray);margin-top:4px;text-align:right">
+      ${tend[0]?.fecha?.substring(5)||''} → ${tend[tend.length-1]?.fecha?.substring(5)||''}
+    </div>`;
+  }
+
+  // Por asesora
+  const vcols=['var(--teal)','var(--green)','var(--amber)','var(--purple)','var(--red)'];
+  const byVend = data.byVend||[];
+  const maxBar = Math.max(...byVend.map(v=>v.total||0),1);
+  document.getElementById('reactVendGrid').innerHTML = byVend.map((v,i)=>{
+    const conv2 = v.total>0?((v.ventas/v.total)*100).toFixed(1):'0.0';
+    const cc = parseFloat(conv2)>=3?'var(--green)':parseFloat(conv2)>=1?'var(--amber)':'var(--red)';
+    const perfil = vendedoras.find(p=>p.usuario===v.key);
+    const nombre = perfil?.nombre||v.nombre||v.key;
+    return `<div class="card" style="margin:0;border-top:4px solid ${vcols[i%vcols.length]}">
+      <div style="font-size:14px;font-weight:700;color:${vcols[i%vcols.length]};margin-bottom:8px">${nombre}</div>
+      <div class="bar-item" style="margin-bottom:5px">
+        <div class="bar-name">Contactos</div>
+        <div style="flex:1;margin:0 8px"><div style="height:5px;background:var(--ltgray);border-radius:3px">
+          <div style="height:5px;background:${vcols[i%vcols.length]};border-radius:3px;width:${Math.round((v.total||0)/maxBar*100)}%"></div>
+        </div></div>
+        <div class="bar-val" style="font-weight:800">${v.total||0}</div>
+      </div>
+      <div class="bar-item" style="margin-bottom:5px">
+        <div class="bar-name">Ventas</div>
+        <div style="flex:1;margin:0 8px"><div style="height:5px;background:var(--ltgray);border-radius:3px">
+          <div style="height:5px;background:var(--purple);border-radius:3px;width:${Math.round((v.ventas||0)/(v.total||1)*100)}%"></div>
+        </div></div>
+        <div class="bar-val" style="color:var(--purple);font-weight:800">${v.ventas||0}</div>
+      </div>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--ltgray);display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:11px;color:var(--gray)">Conv. Rate</span>
+        <span style="font-size:18px;font-weight:800;color:${cc}">${conv2}%</span>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ================================================================

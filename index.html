@@ -1425,30 +1425,35 @@ async function cargarPautasLista() {
   });
 }
 
-const ESTADOS = ['Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua','Coahuila','Colima','DF / CDMX','Durango','Estado de Mexico','Guanajuato','Guerrero','Hidalgo','Jalisco','Michoacan','Morelos','Nayarit','Nuevo Leon','Oaxaca','Puebla','Queretaro','Quintana Roo','San Luis Potosi','Sinaloa','Sonora','Tabasco','Tamaulipas','Tlaxcala','Veracruz','Yucatan','Zacatecas','No encontrado'];
+const ESTADOS = ['Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua','Coahuila','Colima','DF / CDMX','Durango','Estado de Mexico','Guanajuato','Guerrero','Hidalgo','Jalisco','Michoacan','Michoacán','Morelos','Nayarit','Nuevo Leon','Nuevo León','Oaxaca','Puebla','Queretaro','Querétaro','Quintana Roo','San Luis Potosi','San Luis Potosí','Sinaloa','Sonora','Tabasco','Tamaulipas','Tlaxcala','Veracruz','Yucatan','Yucatán','Zacatecas','No encontrado'];
 function fillEstadosSelects() {
   const opts = '<option value="">— Seleccionar —</option>' + ESTADOS.map(e=>`<option value="${e}">${e}</option>`).join('');
   ['fEstado','eEstado'].forEach(id => { const el=document.getElementById(id); if(el) el.innerHTML=opts; });
 }
 
+function normStr(s) {
+  return (s||'').toLowerCase().trim()
+    .replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i')
+    .replace(/ó/g,'o').replace(/ú/g,'u').replace(/ñ/g,'n');
+}
 function setEstadoSelect(selectId, valor) {
   const el = document.getElementById(selectId);
   if (!el || !valor || valor === 'nan') return;
-  // Try exact match first
-  if ([...el.options].some(o => o.value === valor)) {
-    el.value = valor;
-    return;
-  }
-  // Try case-insensitive match
-  const norm = valor.toLowerCase().trim();
-  const match = [...el.options].find(o => o.value.toLowerCase().trim() === norm);
-  if (match) { el.value = match.value; return; }
-  // Try partial match (DB might have accent differences)
-  const partial = [...el.options].find(o =>
-    o.value.toLowerCase().replace(/[áéíóúñ]/g, c => ({á:'a',é:'e',í:'i',ó:'o',ú:'u',ñ:'n'}[c]||c))
-    === norm.replace(/[áéíóúñ]/g, c => ({á:'a',é:'e',í:'i',ó:'o',ú:'u',ñ:'n'}[c]||c))
-  );
-  if (partial) el.value = partial.value;
+  const opts = [...el.options];
+  // 1. Exact match
+  if (opts.some(o => o.value === valor)) { el.value = valor; return; }
+  // 2. Case-insensitive
+  const m2 = opts.find(o => o.value.toLowerCase() === valor.toLowerCase());
+  if (m2) { el.value = m2.value; return; }
+  // 3. Normalized (no accents)
+  const nv = normStr(valor);
+  const m3 = opts.find(o => normStr(o.value) === nv);
+  if (m3) { el.value = m3.value; return; }
+  // 4. Add as custom option if not found (preserves value)
+  const opt = document.createElement('option');
+  opt.value = valor; opt.text = valor;
+  el.appendChild(opt);
+  el.value = valor;
 }
 
 function switchTab(id) {

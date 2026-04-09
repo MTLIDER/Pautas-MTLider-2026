@@ -114,8 +114,10 @@ button,input,select,textarea{font-family:inherit}
 .tab-btn.active{color:var(--teal);border-bottom-color:var(--teal)}
 
 /* ── PANELS ─────────────────────────────────────────────────────── */
-.tab-panel{display:none;padding:12px 16px 20px;max-width:1200px;margin:0 auto;animation:fi .2s ease}
-.tab-panel.active{display:block}
+.tab-panel{display:none;padding:8px 16px 20px;max-width:1200px;margin:0 auto}
+.tab-panel.active{display:block;animation:none}
+.tab-panel .sec-title{margin-top:0!important}
+.tab-panel .sec-sub{margin-bottom:10px}
 @keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 .sec-title{font-size:17px;font-weight:800;margin-bottom:3px}
 .sec-sub{font-size:12px;color:var(--gray);margin-bottom:16px}
@@ -3853,11 +3855,12 @@ const TIPO_COLORS = {
 };
 
 async function cargarBitacoraTab() {
-  // Populate vendedoras filter in bitacora tab
+  // Load all users (not just asesoras) for the filter
+  const {data: perfiles} = await SB.from('perfiles').select('usuario,nombre').eq('activo',true).order('nombre');
   const vSel = document.getElementById('bitVend2');
-  if (vSel && vSel.options.length <= 1 && vendedoras.length) {
+  if (vSel && perfiles) {
     vSel.innerHTML = '<option value="">Todas las asesoras</option>' +
-      vendedoras.map(v=>`<option value="${v.usuario}">${v.nombre||v.usuario}</option>`).join('');
+      perfiles.map(v=>`<option value="${v.usuario}">${v.nombre||v.usuario}</option>`).join('');
   }
   cargarBitacora();
 }
@@ -3881,10 +3884,29 @@ async function cargarBitacora() {
     p_desde: desde||null, p_hasta: hasta||null,
     p_folio: folio||null, p_limit: 150
   });
-  if (error || !data || !data.length) {
-    el.innerHTML = `<div style="padding:20px;text-align:center;color:var(--gray);font-size:12px">
-      ${error ? 'Error: ' + error.message : 'Sin eventos registrados aun. Los eventos apareceran automaticamente cuando se realicen cambios.'}
+  if (error) {
+    const isMissing = error.message?.includes('function') || error.message?.includes('get_bitacora');
+    const html = `<div style="padding:24px;text-align:center;color:var(--gray)">
+      <div style="font-size:32px;margin-bottom:10px">📋</div>
+      <div style="font-weight:700;font-size:14px;margin-bottom:8px">
+        ${isMissing ? 'Bitácora no configurada' : 'Error: '+error.message}
+      </div>
+      ${isMissing ? `<div style="font-size:12px;max-width:400px;margin:0 auto">
+        Corre el SQL <b>bitacora_cambios.sql</b> en Supabase (proyecto xmwtngobwcpfycgfcsvk) 
+        para activar el registro de eventos.
+      </div>` : ''}
     </div>`;
+    if (el1) el1.innerHTML = html;
+    if (el2) el2.innerHTML = html;
+    return;
+  }
+  if (!data || !data.length) {
+    const html = `<div style="padding:24px;text-align:center;color:var(--gray);font-size:12px">
+      <div style="font-size:28px;margin-bottom:8px">📭</div>
+      Sin eventos registrados aún. Los eventos aparecerán automáticamente cuando se realicen cambios en el CRM.
+    </div>`;
+    if (el1) el1.innerHTML = html;
+    if (el2) el2.innerHTML = html;
     return;
   }
   const html = `<div class="tw"><table>

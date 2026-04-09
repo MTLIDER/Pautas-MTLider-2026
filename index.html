@@ -1427,8 +1427,28 @@ async function cargarPautasLista() {
 
 const ESTADOS = ['Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua','Coahuila','Colima','DF / CDMX','Durango','Estado de Mexico','Guanajuato','Guerrero','Hidalgo','Jalisco','Michoacan','Morelos','Nayarit','Nuevo Leon','Oaxaca','Puebla','Queretaro','Quintana Roo','San Luis Potosi','Sinaloa','Sonora','Tabasco','Tamaulipas','Tlaxcala','Veracruz','Yucatan','Zacatecas','No encontrado'];
 function fillEstadosSelects() {
-  const opts = '<option value="">— Seleccionar —</option>' + ESTADOS.map(e=>`<option>${e}</option>`).join('');
+  const opts = '<option value="">— Seleccionar —</option>' + ESTADOS.map(e=>`<option value="${e}">${e}</option>`).join('');
   ['fEstado','eEstado'].forEach(id => { const el=document.getElementById(id); if(el) el.innerHTML=opts; });
+}
+
+function setEstadoSelect(selectId, valor) {
+  const el = document.getElementById(selectId);
+  if (!el || !valor || valor === 'nan') return;
+  // Try exact match first
+  if ([...el.options].some(o => o.value === valor)) {
+    el.value = valor;
+    return;
+  }
+  // Try case-insensitive match
+  const norm = valor.toLowerCase().trim();
+  const match = [...el.options].find(o => o.value.toLowerCase().trim() === norm);
+  if (match) { el.value = match.value; return; }
+  // Try partial match (DB might have accent differences)
+  const partial = [...el.options].find(o =>
+    o.value.toLowerCase().replace(/[áéíóúñ]/g, c => ({á:'a',é:'e',í:'i',ó:'o',ú:'u',ñ:'n'}[c]||c))
+    === norm.replace(/[áéíóúñ]/g, c => ({á:'a',é:'e',í:'i',ó:'o',ú:'u',ñ:'n'}[c]||c))
+  );
+  if (partial) el.value = partial.value;
 }
 
 function switchTab(id) {
@@ -1730,7 +1750,7 @@ let editingId=null, editVend=null;
 let nvContactoId=null, nvNumero=null, nvNombre=null;
 
 async function abrirContacto(row) {
-  editingId = row.id; editVend = row.vendedora;
+  editingId = row.id; editVend = row.vendedora; window._editingEstado = row.estado;
   document.getElementById('cModalSub').textContent = `ID: ${row.folio||row.id.substring(0,8)} · ${row.vendedora}`;
   const sv = (id,v) => { const e=document.getElementById(id); if(e) e.value=(v&&v!='nan')?v:''; };
   sv('eNumero',row.numero); sv('eNombre',row.nombre); sv('eEstado',row.estado);
@@ -1789,7 +1809,7 @@ async function guardarEdicion() {
     const updates = {
       numero:   document.getElementById('eNumero').value.trim(),
       nombre:   document.getElementById('eNombre').value.trim()||null,
-      estado:   document.getElementById('eEstado').value||null,
+      estado:   document.getElementById('eEstado').value || window._editingEstado || null,
       horario:  document.getElementById('eHorario').value||null,
       semaforo: sem,
       pauta:    document.getElementById('ePauta').value||null,

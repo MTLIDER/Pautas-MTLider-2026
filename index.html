@@ -114,7 +114,7 @@ button,input,select,textarea{font-family:inherit}
 .tab-btn.active{color:var(--teal);border-bottom-color:var(--teal)}
 
 /* ── PANELS ─────────────────────────────────────────────────────── */
-.tab-panel{display:none;padding:8px 16px 20px;max-width:1200px;margin:0 auto}
+.tab-panel{display:none;padding:8px 16px 20px;max-width:1200px;margin:0 auto;min-height:calc(100vh - 100px)}
 .tab-panel.active{display:block;animation:none}
 .tab-panel .sec-title{margin-top:0!important}
 .tab-panel .sec-sub{margin-bottom:10px}
@@ -885,7 +885,7 @@ tr:hover td{background:#f9fafb}
 </div>
 
   <!-- PIPELINES DE CAMPANA -->
-  <div class="tab-panel" id="panel-pipelines">
+  <div class="tab-panel" id="panel-pipelines" style="padding-top:0">
     <div class="sec-title" style="margin-top:0">Pipelines de Campaña</div>
     <div class="sec-sub">Elige un pipeline para editar sus etapas y tareas, o crea uno nuevo</div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -911,7 +911,7 @@ tr:hover td{background:#f9fafb}
   </div>
 
   <!-- PROSPECCION DASHBOARD -->
-  <div class="tab-panel" id="panel-prospeccion">
+  <div class="tab-panel" id="panel-prospeccion" style="padding-top:0">
     <div class="sec-title" style="margin-top:0">🔍 Dashboard — Prospeccion</div>
     <div class="sec-sub">Estadisticas de contactos prospectados directamente por el equipo</div>
 
@@ -925,9 +925,7 @@ tr:hover td{background:#f9fafb}
     </div>
 
     <!-- KPI Cards -->
-    <div class="kpi-grid" id="prospKpiGrid">
-      <div class="loading"><div class="sp"></div></div>
-    </div>
+    <div class="kpi-grid" id="prospKpiGrid"><div class="kpi-card" style="opacity:.2"><div class="kpi-label">CARGANDO</div><div class="kpi-value">—</div></div><div class="kpi-card" style="opacity:.2"><div class="kpi-label">CARGANDO</div><div class="kpi-value">—</div></div><div class="kpi-card" style="opacity:.2"><div class="kpi-label">CARGANDO</div><div class="kpi-value">—</div></div><div class="kpi-card" style="opacity:.2"><div class="kpi-label">CARGANDO</div><div class="kpi-value">—</div></div></div>
 
     <!-- Semaforo -->
     <div class="card" style="margin-top:16px">
@@ -962,7 +960,7 @@ tr:hover td{background:#f9fafb}
   </div>
 
   <!-- REACTIVACION DASHBOARD -->
-  <div class="tab-panel" id="panel-reactivacion" style="padding-top:12px">
+  <div class="tab-panel" id="panel-reactivacion">
     <div class="sec-title" style="margin-top:0">🔄 Dashboard — Reactivacion</div>
     <div class="sec-sub">Clientes previos que se estan reactivando — independiente de Pautas y Prospeccion</div>
 
@@ -1002,7 +1000,7 @@ tr:hover td{background:#f9fafb}
   </div>
 
   <!-- BITACORA -->
-  <div class="tab-panel" id="panel-bitacora" style="padding-top:12px">
+  <div class="tab-panel" id="panel-bitacora">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
       <div>
         <div class="sec-title" style="margin-top:0">📋 Bitácora de Cambios</div>
@@ -1043,7 +1041,7 @@ tr:hover td{background:#f9fafb}
   </div>
 
   <!-- CAMPANAS -->
-  <div class="tab-panel" id="panel-campanas">
+  <div class="tab-panel" id="panel-campanas" style="padding-top:0">
     <div class="sec-title" style="margin-top:0">Campanas de Reactivacion</div>
     <div class="sec-sub">Retoma contactos historicos de forma escalonada — un dia a la vez</div>
 

@@ -2121,20 +2121,26 @@ async function cargarRecompras() {
   // Traer ventas + nombre/asesora desde contactos para tener nombre completo
   const [ventasRes, contactosRes] = await Promise.all([
     SB.from('ventas').select('id,numero,nombre,vendedora,monto,fecha_venta').order('numero'),
-    SB.from('contactos').select('numero,nombre')
+    SB.from('contactos').select('numero,nombre').not('nombre','is',null).neq('nombre','')
   ]);
   const data = ventasRes.data;
   if (!data) { el.innerHTML='<div class="loading">Error cargando datos.</div>'; return; }
-  // Build nombre lookup from contactos (more reliable than ventas.nombre)
+  // Build nombre lookup — keep FIRST non-empty nombre found per numero
   const nombreLookup = {};
   (contactosRes.data||[]).forEach(ct => {
-    const nm = (ct.nombre||'').trim(); if (nm && nm !== '—') nombreLookup[ct.numero] = nm;
+    const nm = (ct.nombre||'').trim();
+    // Only store if not empty and not already stored (first non-empty wins)
+    if (nm && nm !== '—' && !nombreLookup[ct.numero]) {
+      nombreLookup[ct.numero] = nm;
+    }
   });
   const cl={};
   data.forEach(v=>{
     const n=v.numero;
-    const nombre = nombreLookup[n] || v.nombre || '—';
+    // Use contactos nombre first, then ventas nombre, then —
+    const nombre = nombreLookup[n] || (v.nombre||'').trim() || '—';
     if(!cl[n]) cl[n]={numero:n,nombre,vendedora:v.vendedora,compras:0,montoTotal:0,ultima:''};
+    // If we stored — but now found a real name, upgrade it
     else if(cl[n].nombre==='—' && nombre!=='—') cl[n].nombre=nombre;
     cl[n].compras++;
     cl[n].montoTotal+=parseFloat(v.monto)||0;

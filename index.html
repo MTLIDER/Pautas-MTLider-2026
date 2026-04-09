@@ -96,7 +96,7 @@ button,input,select,textarea{font-family:inherit}
 .l-err{color:var(--red);font-size:12px;margin-top:8px;min-height:16px;text-align:center}
 
 /* ── APP ────────────────────────────────────────────────────────── */
-#app{display:none;min-height:100vh;padding-top:54px}
+#app{display:none;min-height:100vh;padding-top:54px}#contentArea{min-height:calc(100vh - 98px)}
 .topbar{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:10px;box-shadow:0 1px 6px rgba(0,0,0,.06)}
 .topbar-logo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:14px;color:var(--dark)}
 .hex{width:29px;height:29px;background:linear-gradient(135deg,var(--teal),var(--green));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff}
@@ -108,6 +108,7 @@ button,input,select,textarea{font-family:inherit}
 
 /* ── TABS ───────────────────────────────────────────────────────── */
 .tabs-nav{position:sticky;top:54px;z-index:90;background:#fff;border-bottom:1px solid var(--border);display:flex;padding:0 16px;gap:2px;overflow-x:auto;scrollbar-width:none}
+#contentArea{overflow-y:auto;overflow-x:hidden}
 .tabs-nav::-webkit-scrollbar{display:none}
 .tab-btn{padding:12px 14px;font-size:13px;font-weight:600;color:var(--gray);border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;transition:.15s;white-space:nowrap}
 .tab-btn.active{color:var(--teal);border-bottom-color:var(--teal)}
@@ -647,6 +648,7 @@ tr:hover td{background:#f9fafb}
     </div>
   </div>
   <div class="tabs-nav" id="tabsNav"></div>
+  <div id="contentArea">
 
   <!-- REGISTRAR -->
   <div class="tab-panel" id="panel-registrar">
@@ -1069,6 +1071,8 @@ tr:hover td{background:#f9fafb}
       </div>
     </div>
   </div>
+
+  </div><!-- end contentArea -->
 
 <!-- MODAL: Detalle / Editar contacto + Pipeline -->
 <div class="modal-ov" id="contactoModal">

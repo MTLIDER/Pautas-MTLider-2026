@@ -814,7 +814,7 @@ tr:hover td{background:#f9fafb}
       <div class="card" style="margin:0"><div class="card-title">Mapa de Calor · Republica Mexicana</div><div class="card-sub">Contactos por estado</div><div class="map-wrap" id="mapWrap"><div class="map-tip" id="mapTip"></div><svg id="mexSvg" viewBox="0 0 960 600" xmlns="http://www.w3.org/2000/svg"></svg></div></div>
     </div>
     <div class="card"><div class="card-title">Tendencia · Ultimos dias</div><div class="card-sub">Contactos por dia</div><div id="sparkWrap"></div></div>
-    <div class="card"><div class="card-title">Por Vendedora</div><div class="card-sub">Metricas individuales</div><div class="g2" style="margin:0" id="vendGrid"></div></div>
+    <div class="card" id="vendCard"><div class="card-title">Por Vendedora</div><div class="card-sub">Metricas individuales</div><div class="g2" style="margin:0" id="vendGrid"></div></div>
 
     <!-- CUMPLIMIENTO -->
     <div class="card">
@@ -2258,41 +2258,48 @@ function renderDash(d, desde, hasta, vend) {
 
   // ── VENDEDORAS ─────────────────────────────────────────────────
   const vcols=['var(--teal)','var(--green)','var(--amber)','var(--purple)','var(--red)'];
-  document.getElementById('vendGrid').innerHTML = (d.byVend||[]).map((v,i)=>{
-    const conv = v.total > 0 ? ((v.ventas/v.total)*100).toFixed(1) : '0.0';
-    const convColor = parseFloat(conv)>=3?'var(--green)':parseFloat(conv)>=1?'var(--amber)':'var(--red)';
+  const vendCard = document.getElementById('vendCard');
+  if (vend) {
+    // Filtro individual: ocultar sección comparativa
+    if (vendCard) vendCard.style.display = 'none';
+  } else {
+    if (vendCard) vendCard.style.display = 'block';
     const maxBar = Math.max(...(d.byVend||[]).map(x=>x.total||0), 1);
-    return `<div class="card" style="margin:0;border-top:4px solid ${vcols[i%vcols.length]}">
-      <div style="font-size:14px;font-weight:700;color:${vcols[i%vcols.length]};margin-bottom:10px">${v.nombre||v.key}</div>
-      <div class="bar-item" style="margin-bottom:6px">
-        <div class="bar-name">Contactos</div>
-        <div style="flex:1;margin:0 10px">
-          <div style="height:6px;background:var(--ltgray);border-radius:3px">
-            <div style="height:6px;background:${vcols[i%vcols.length]};border-radius:3px;width:${Math.round((v.total||0)/maxBar*100)}%"></div>
+    document.getElementById('vendGrid').innerHTML = (d.byVend||[]).map((v,i)=>{
+      const conv = v.total > 0 ? ((v.ventas/v.total)*100).toFixed(1) : '0.0';
+      const convColor = parseFloat(conv)>=3?'var(--green)':parseFloat(conv)>=1?'var(--amber)':'var(--red)';
+      return `<div class="card" style="margin:0;border-top:4px solid ${vcols[i%vcols.length]}">
+        <div style="font-size:14px;font-weight:700;color:${vcols[i%vcols.length]};margin-bottom:10px">${v.nombre||v.key}</div>
+        <div class="bar-item" style="margin-bottom:6px">
+          <div class="bar-name">Contactos</div>
+          <div style="flex:1;margin:0 10px">
+            <div style="height:6px;background:var(--ltgray);border-radius:3px">
+              <div style="height:6px;background:${vcols[i%vcols.length]};border-radius:3px;width:${Math.round((v.total||0)/maxBar*100)}%"></div>
+            </div>
           </div>
+          <div class="bar-val" style="color:var(--dark);font-size:14px;font-weight:800">${v.total||0}</div>
         </div>
-        <div class="bar-val" style="color:var(--dark);font-size:14px;font-weight:800">${v.total||0}</div>
-      </div>
-      <div class="bar-item" style="margin-bottom:6px">
-        <div class="bar-name">Ventas</div>
-        <div style="flex:1;margin:0 10px">
-          <div style="height:6px;background:var(--ltgray);border-radius:3px">
-            <div style="height:6px;background:var(--purple);border-radius:3px;width:${Math.round((v.ventas||0)/(v.total||1)*100)}%"></div>
+        <div class="bar-item" style="margin-bottom:6px">
+          <div class="bar-name">Ventas</div>
+          <div style="flex:1;margin:0 10px">
+            <div style="height:6px;background:var(--ltgray);border-radius:3px">
+              <div style="height:6px;background:var(--purple);border-radius:3px;width:${Math.round((v.ventas||0)/(v.total||1)*100)}%"></div>
+            </div>
           </div>
+          <div class="bar-val" style="color:var(--purple);font-size:14px;font-weight:800">${v.ventas||0}</div>
         </div>
-        <div class="bar-val" style="color:var(--purple);font-size:14px;font-weight:800">${v.ventas||0}</div>
-      </div>
-      <div class="bar-item" style="margin-bottom:6px">
-        <div class="bar-name">Monto</div>
-        <div style="flex:1"></div>
-        <div class="bar-val" style="color:var(--green);font-size:13px;font-weight:800">${'$'+(v.monto||0).toLocaleString('es-MX',{minimumFractionDigits:0})}</div>
-      </div>
-      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--ltgray);display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:11px;color:var(--gray);font-weight:600">Conv. Rate</span>
-        <span style="font-size:20px;font-weight:800;color:${convColor}">${conv}%</span>
-      </div>
-    </div>`;
-  }).join('');
+        <div class="bar-item" style="margin-bottom:6px">
+          <div class="bar-name">Monto</div>
+          <div style="flex:1"></div>
+          <div class="bar-val" style="color:var(--green);font-size:13px;font-weight:800">${'$'+(v.monto||0).toLocaleString('es-MX',{minimumFractionDigits:0})}</div>
+        </div>
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--ltgray);display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:11px;color:var(--gray);font-weight:600">Conv. Rate</span>
+          <span style="font-size:20px;font-weight:800;color:${convColor}">${conv}%</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
 
   // ── MAPA MEXICO ────────────────────────────────────────────────
   renderMexicoMap(allEst);

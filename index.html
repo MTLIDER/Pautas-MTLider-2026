@@ -772,8 +772,20 @@ tr:hover td{background:#f9fafb}
 
   <!-- DASHBOARD -->
   <div class="tab-panel" id="panel-dashboard">
-    <div class="sec-title">Dashboard KPIs</div>
-    <div class="sec-sub" id="dashSub">Cargando...</div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px">
+      <div>
+        <div class="sec-title" style="margin-bottom:0">Dashboard KPIs</div>
+        <div class="sec-sub" id="dashSub">Cargando...</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-shrink:0;margin-top:4px">
+        <button onclick="imprimirReporte()" class="btn-sm" style="white-space:nowrap">
+          🖨️ Imprimir
+        </button>
+        <button onclick="switchTab('bitacora')" class="btn-sm" style="white-space:nowrap">
+          📋 Bitácora
+        </button>
+      </div>
+    </div>
     <div class="dash-filter">
       <div class="preset-btns">
         <button class="preset-btn" onclick="preset('hoy',this)">Hoy</button>
@@ -939,6 +951,42 @@ tr:hover td{background:#f9fafb}
     <div class="card" style="margin-top:16px">
       <div class="card-title">Tendencia ultimos 30 dias</div>
       <div id="prospSparkWrap" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+  <!-- BITACORA -->
+  <div class="tab-panel" id="panel-bitacora">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div>
+        <div class="sec-title" style="margin-top:0">📋 Bitácora de Cambios</div>
+        <div class="sec-sub">Registro de quien hizo que, cuando y a que hora</div>
+      </div>
+      <button class="btn-sm" onclick="cargarBitacora()">↻ Actualizar</button>
+    </div>
+    <!-- Filtros -->
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <select id="bitVend2" class="f-sel" style="font-size:11px" onchange="cargarBitacora()">
+          <option value="">Todas las asesoras</option>
+        </select>
+        <select id="bitTipo2" class="f-sel" style="font-size:11px" onchange="cargarBitacora()">
+          <option value="">Todos los eventos</option>
+          <option value="semaforo_cambio">🔄 Cambios de semaforo</option>
+          <option value="venta_cerrada">💰 Ventas cerradas</option>
+          <option value="tarea_completada">✅ Tareas completadas</option>
+          <option value="reasignacion">👤 Reasignaciones</option>
+          <option value="fecha_cambio">📅 Cambios de fecha</option>
+          <option value="campana_creada">📣 Campanas creadas</option>
+        </select>
+        <input type="date" id="bitDesde2" class="f-sel" style="font-size:11px;padding:7px 9px" onchange="cargarBitacora()">
+        <input type="date" id="bitHasta2" class="f-sel" style="font-size:11px;padding:7px 9px" onchange="cargarBitacora()">
+        <input type="text" id="bitFolio2" placeholder="Buscar folio o descripcion..." 
+          style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:11px;min-width:200px" 
+          onkeydown="if(event.key==='Enter')cargarBitacora()">
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div id="bitacoraContent2"><div class="loading"><div class="sp"></div></div></div>
     </div>
   </div>
 
@@ -1243,9 +1291,9 @@ async function initApp() {
   const isMkt   = SESSION.rol === 'MARKETING';
 
   const tabs = isAdmin
-    ? [{id:'dashboard',l:'📣 Pautas'},{id:'prospeccion',l:'🔍 Prospeccion'},{id:'todos',l:'📋 Registros'},{id:'recompras',l:'🔁 Recompras'},{id:'registrar',l:'➕ Registrar'},{id:'asesoras',l:'👥 Asesoras'},{id:'listas',l:'⚙️ Listas'},{id:'campanas',l:'📣 Campanas'},{id:'pipelines',l:'🔧 Pipelines'}]
+    ? [{id:'dashboard',l:'📣 Pautas'},{id:'prospeccion',l:'🔍 Prospeccion'},{id:'bitacora',l:'📋 Bitacora'},{id:'todos',l:'📋 Registros'},{id:'recompras',l:'🔁 Recompras'},{id:'registrar',l:'➕ Registrar'},{id:'asesoras',l:'👥 Asesoras'},{id:'listas',l:'⚙️ Listas'},{id:'campanas',l:'📣 Campanas'},{id:'pipelines',l:'🔧 Pipelines'}]
     : isMkt
-    ? [{id:'dashboard',l:'📣 Pautas'},{id:'prospeccion',l:'🔍 Prospeccion'}]
+    ? [{id:'dashboard',l:'📣 Pautas'},{id:'prospeccion',l:'🔍 Prospeccion'},{id:'bitacora',l:'📋 Bitacora'}]
     : [{id:'registrar',l:'➕ Registrar'},{id:'misregistros',l:'📋 Mis Registros'}];
 
   const nav = document.getElementById('tabsNav');
@@ -3793,15 +3841,30 @@ const TIPO_COLORS = {
   pipeline_cambio:   '#f1f5f9',
 };
 
+async function cargarBitacoraTab() {
+  // Populate vendedoras filter in bitacora tab
+  const vSel = document.getElementById('bitVend2');
+  if (vSel && vSel.options.length <= 1 && vendedoras.length) {
+    vSel.innerHTML = '<option value="">Todas las asesoras</option>' +
+      vendedoras.map(v=>`<option value="${v.usuario}">${v.nombre||v.usuario}</option>`).join('');
+  }
+  cargarBitacora();
+}
+
 async function cargarBitacora() {
-  const el = document.getElementById('bitacoraContent');
+  // Support both dashboard bitacora card and standalone tab
+  const el1 = document.getElementById('bitacoraContent');
+  const el2 = document.getElementById('bitacoraContent2');
+  const el = el2 || el1;
   if (!el) return;
-  el.innerHTML = '<div class="loading"><div class="sp"></div></div>';
-  const vend  = document.getElementById('bitVend')?.value  || null;
-  const tipo  = document.getElementById('bitTipo')?.value  || null;
-  const desde = document.getElementById('bitDesde')?.value || null;
-  const hasta = document.getElementById('bitHasta')?.value || null;
-  const folio = document.getElementById('bitFolio')?.value || null;
+  if (el1) el1.innerHTML = '<div class="loading"><div class="sp"></div></div>';
+  if (el2) el2.innerHTML = '<div class="loading"><div class="sp"></div></div>';
+
+  const vend  = document.getElementById('bitVend2')?.value  || document.getElementById('bitVend')?.value  || null;
+  const tipo  = document.getElementById('bitTipo2')?.value  || document.getElementById('bitTipo')?.value  || null;
+  const desde = document.getElementById('bitDesde2')?.value || document.getElementById('bitDesde')?.value || null;
+  const hasta = document.getElementById('bitHasta2')?.value || document.getElementById('bitHasta')?.value || null;
+  const folio = document.getElementById('bitFolio2')?.value || document.getElementById('bitFolio')?.value || null;
   const { data, error } = await SB.rpc('get_bitacora', {
     p_usuario: vend, p_tipo: tipo,
     p_desde: desde||null, p_hasta: hasta||null,
@@ -3813,7 +3876,7 @@ async function cargarBitacora() {
     </div>`;
     return;
   }
-  el.innerHTML = `<div class="tw"><table>
+  const html = `<div class="tw"><table>
     <thead><tr>
       <th style="width:80px">Fecha</th>
       <th style="width:60px">Hora</th>

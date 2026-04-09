@@ -1802,6 +1802,12 @@ async function guardarEdicion() {
     };
     const { error } = await SB.from('contactos').update(updates).eq('id',editingId);
     if (error) { toast('Error: '+error.message,'err'); btn.disabled=false; btn.textContent='Guardar cambios'; return; }
+    // Sync nombre to ventas table so Recompras shows correct name
+    if (updates.nombre) {
+      await SB.from('ventas').update({nombre: updates.nombre})
+        .eq('numero', updates.numero)
+        .is('nombre', null);
+    }
     // Venta: solo insertar si hay monto capturado Y folio (nueva venta intencional)
     if (esV) {
       const monto = parseFloat(document.getElementById('eMonto').value)||0;

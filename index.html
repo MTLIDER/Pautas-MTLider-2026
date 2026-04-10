@@ -1978,6 +1978,7 @@ document.getElementById('contactoModal').addEventListener('click',function(e){if
 const ETAPA_NOMBRES = ['Primer Contacto','Seguimiento Activo','Cierre','Postventa'];
 
 async function cargarPipeline(contactoId, etapaActual) {
+  etapaActual = etapaActual || 1; // null/undefined → etapa 1
   document.getElementById('pipelineTasks').innerHTML='<div class="loading"><div class="sp"></div></div>';
   document.getElementById('pipelineStages').innerHTML='';
   const { data: checks } = await SB.from('etapas_checks')

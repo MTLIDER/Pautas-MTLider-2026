@@ -2038,7 +2038,6 @@ async function cargarPipeline(contactoId, etapaActual) {
     const {data:tplEtapas} = await SB.from('template_tareas')
       .select('etapa, etapa_nombre')
       .eq('template_id', templateIdActivo)
-      .not('etapa_nombre', 'is', null)
       .order('etapa');
     if (tplEtapas && tplEtapas.length) {
       // Construir mapa de etapa → nombre, sin duplicados

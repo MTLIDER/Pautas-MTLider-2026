@@ -2013,7 +2013,7 @@ async function cargarPipeline(contactoId, etapaActual) {
   const { data: checks } = await SB.from('etapas_checks')
     .select('*').eq('contacto_id',contactoId).order('etapa').order('orden');
   // Get recursos from tareas_template matching by tarea text
-  const { data: plantillas } = await SB.from('tareas_template')
+  const { data: plantillas } = await SB.from('template_tareas')
     .select('id,tarea,recurso_url,recurso_tipo,recurso_nombre').eq('activo',true);
   const plantillaMap = {};
   (plantillas||[]).forEach(p => { plantillaMap[p.tarea] = p; });

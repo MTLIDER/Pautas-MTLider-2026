@@ -999,6 +999,71 @@ tr:hover td{background:#f9fafb}
     </div>
   </div>
 
+  <!-- WA ANALYTICS -->
+  <div class="tab-panel" id="panel-wa_analytics">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px">
+      <div>
+        <div class="sec-title" style="margin-top:0">📊 Análisis de WhatsApp</div>
+        <div class="sec-sub">Eficiencia, conversión y productos por asesora</div>
+      </div>
+      <button class="btn-sm" onclick="cargarWAAnalytics()">↻ Actualizar</button>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <div>
+          <div style="font-size:10px;color:var(--gray);margin-bottom:3px;font-weight:700">PERIODO</div>
+          <div style="display:flex;gap:4px">
+            <button class="preset-btn active" onclick="waPreset('hoy',this)">Hoy</button>
+            <button class="preset-btn" onclick="waPreset('ayer',this)">Ayer</button>
+            <button class="preset-btn" onclick="waPreset('semana',this)">Esta semana</button>
+            <button class="preset-btn" onclick="waPreset('mes',this)">Este mes</button>
+          </div>
+        </div>
+        <input type="date" id="waDesde" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:11px">
+        <input type="date" id="waHasta" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:11px">
+        <select id="waAsesora" class="f-sel" style="font-size:11px" onchange="cargarWAAnalytics()">
+          <option value="">Todo el equipo</option>
+        </select>
+        <button class="btn-sm primary" onclick="cargarWAAnalytics()">Aplicar</button>
+      </div>
+    </div>
+
+    <!-- KPIs globales -->
+    <div class="kpi-grid" id="waKpiGrid" style="margin-bottom:16px">
+      <div class="loading"><div class="sp"></div></div>
+    </div>
+
+    <!-- Por asesora -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">Comparativa por Asesora</div>
+      <div class="card-sub">Eficiencia, tiempo de respuesta y conversión</div>
+      <div id="waAsesorasGrid" style="margin-top:12px;overflow-x:auto"></div>
+    </div>
+
+    <!-- 2 col: productos negados + solicitados -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div class="card">
+        <div class="card-title">❌ Productos Negados</div>
+        <div class="card-sub">Lo que pedimos y no tenemos</div>
+        <div id="waProductosNegados" style="margin-top:10px"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📦 Más Solicitados</div>
+        <div class="card-sub">Lo que más nos piden</div>
+        <div id="waProductosSolicitados" style="margin-top:10px"></div>
+      </div>
+    </div>
+
+    <!-- Tendencia diaria -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">Tendencia de Conversaciones</div>
+      <div class="card-sub">Chats vs Ventas por día</div>
+      <div id="waTendencia" style="margin-top:12px;height:80px"></div>
+    </div>
+  </div>
+
   <!-- BITACORA -->
   <div class="tab-panel" id="panel-bitacora">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -1362,9 +1427,9 @@ async function initApp() {
   const isMkt   = SESSION.rol === 'MARKETING';
 
   const tabs = isAdmin
-    ? [{id:'dashboard',l:'📣 Pautas'},{id:'prospeccion',l:'🔍 Prospeccion'},{id:'reactivacion',l:'🔄 Reactivacion'},{id:'bitacora',l:'📋 Bitacora'},{id:'todos',l:'📋 Registros'},{id:'recompras',l:'🔁 Recompras'},{id:'registrar',l:'➕ Registrar'},{id:'asesoras',l:'👥 Asesoras'},{id:'listas',l:'⚙️ Listas'},{id:'campanas',l:'📣 Campanas'},{id:'pipelines',l:'🔧 Pipelines'}]
+    ? [{id:'dashboard',l:'📣 Pautas'},{id:'prospeccion',l:'🔍 Prospeccion'},{id:'reactivacion',l:'🔄 Reactivacion'},{id:'bitacora',l:'📋 Bitacora'},{id:'wa_analytics',l:'📊 Análisis WA'},{id:'todos',l:'📋 Registros'},{id:'recompras',l:'🔁 Recompras'},{id:'registrar',l:'➕ Registrar'},{id:'asesoras',l:'👥 Asesoras'},{id:'listas',l:'⚙️ Listas'},{id:'campanas',l:'📣 Campanas'},{id:'pipelines',l:'🔧 Pipelines'}]
     : isMkt
-    ? [{id:'dashboard',l:'📣 Pautas'},{id:'prospeccion',l:'🔍 Prospeccion'},{id:'reactivacion',l:'🔄 Reactivacion'},{id:'bitacora',l:'📋 Bitacora'}]
+    ? [{id:'dashboard',l:'📣 Pautas'},{id:'prospeccion',l:'🔍 Prospeccion'},{id:'reactivacion',l:'🔄 Reactivacion'},{id:'bitacora',l:'📋 Bitacora'},{id:'wa_analytics',l:'📊 Análisis WA'}]
     : [{id:'registrar',l:'➕ Registrar'},{id:'misregistros',l:'📋 Mis Registros'}];
 
   const nav = document.getElementById('tabsNav');
@@ -3959,6 +4024,186 @@ function imprimirReporte() {
   win.document.write('</body></html>');
   win.document.close();
   setTimeout(() => win.print(), 600);
+}
+
+// ================================================================
+// WA ANALYTICS DASHBOARD
+// ================================================================
+let _waPreset = 'hoy';
+
+function waPreset(tipo, btn) {
+  _waPreset = tipo;
+  document.querySelectorAll('#panel-wa_analytics .preset-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const hoy = new Date(), fmt = d => d.toISOString().split('T')[0];
+  let desde, hasta;
+  if (tipo === 'hoy')    { desde = hasta = fmt(hoy); }
+  if (tipo === 'ayer')   { const a=new Date(hoy); a.setDate(a.getDate()-1); desde=hasta=fmt(a); }
+  if (tipo === 'semana') { const l=new Date(hoy); l.setDate(hoy.getDate()-((hoy.getDay()||7)-1)); desde=fmt(l); hasta=fmt(hoy); }
+  if (tipo === 'mes')    { desde=fmt(new Date(hoy.getFullYear(),hoy.getMonth(),1)); hasta=fmt(hoy); }
+  const dEl=document.getElementById('waDesde'), hEl=document.getElementById('waHasta');
+  if(dEl) dEl.value=desde; if(hEl) hEl.value=hasta;
+  cargarWAAnalytics();
+}
+
+async function cargarWAAnalytics() {
+  // Populate asesoras filter
+  const vSel = document.getElementById('waAsesora');
+  if (vSel && vSel.options.length <= 1 && vendedoras.length) {
+    vSel.innerHTML = '<option value="">Todo el equipo</option>' +
+      vendedoras.map(v=>`<option value="${v.usuario}">${v.nombre||v.usuario}</option>`).join('');
+  }
+
+  const desde   = document.getElementById('waDesde')?.value   || new Date().toISOString().split('T')[0];
+  const hasta   = document.getElementById('waHasta')?.value   || desde;
+  const asesora = document.getElementById('waAsesora')?.value || null;
+
+  document.getElementById('waKpiGrid').innerHTML = '<div class="loading"><div class="sp"></div></div>';
+  ['waAsesorasGrid','waProductosNegados','waProductosSolicitados','waTendencia']
+    .forEach(id => { const el=document.getElementById(id); if(el) el.innerHTML=''; });
+
+  // Check if table exists
+  const {data, error} = await SB.rpc('get_wa_reporte', {
+    p_desde: desde, p_hasta: hasta, p_asesora: asesora||null
+  });
+
+  if (error) {
+    document.getElementById('waKpiGrid').innerHTML = `
+      <div style="grid-column:1/-1;padding:24px;text-align:center;color:var(--gray)">
+        <div style="font-size:36px;margin-bottom:10px">📊</div>
+        <div style="font-weight:700;font-size:14px;margin-bottom:8px">Sin datos de WhatsApp aún</div>
+        <div style="font-size:12px;max-width:420px;margin:0 auto;line-height:1.6">
+          Para ver análisis aquí necesitas:<br>
+          1. Instalar la extensión Chrome de MTLider WA Sync<br>
+          2. Correr el SQL <b>whatsapp_analytics_tabla.sql</b> en Supabase<br>
+          3. Configurar la extensión con tu usuario y API Key<br>
+          A partir de ahí, cada conversación queda registrada automáticamente.
+        </div>
+        <div style="margin-top:12px;font-size:11px;color:var(--red)">${error.message}</div>
+      </div>`;
+    return;
+  }
+
+  renderWADashboard(data, desde, hasta);
+}
+
+function renderWADashboard(d, desde, hasta) {
+  if (!d) return;
+  const g = d.resumen_global || {};
+
+  // ── KPIs ─────────────────────────────────────────────────────
+  const interesados = g.interesados || 0;
+  const perdidos    = g.perdidos    || 0;
+  const total       = g.total_chats || 0;
+  const eficiencia  = total > 0 ? Math.round(((g.ventas||0) + interesados) / total * 100) : 0;
+  const efColor     = eficiencia >= 70 ? 'var(--green)' : eficiencia >= 40 ? 'var(--amber)' : 'var(--red)';
+
+  document.getElementById('waKpiGrid').innerHTML = `<div class="kpi-grid">
+    ${kpi('CONVERSACIONES', total.toLocaleString(), `${fmtFecha(desde)} al ${fmtFecha(hasta)}`, 'var(--teal)')}
+    ${kpi('VENTAS WA', g.ventas||0, 'Resultado: venta', 'var(--purple)')}
+    ${kpi('EFICIENCIA', eficiencia+'%', 'Ventas + interesados / total', efColor)}
+    ${kpi('RESP. PROM.', (g.tiempo_resp_prom||0)+'min', 'Tiempo 1a respuesta', '#0ea5e9')}
+    ${kpi('CALIDAD PROM.', (g.calidad_prom||0)+'/100', 'Score de atención IA', 'var(--green)')}
+  </div>`;
+
+  // ── POR ASESORA ──────────────────────────────────────────────
+  const asesoras = d.por_asesora || [];
+  const maxChats = Math.max(...asesoras.map(a => a.total_chats||0), 1);
+  const vcols = ['var(--teal)','var(--green)','var(--amber)','var(--purple)','var(--red)'];
+
+  if (asesoras.length) {
+    // Table view
+    document.getElementById('waAsesorasGrid').innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="background:var(--bg)">
+            ${['ASESORA','CHATS','VENTAS','INTERESADOS','PERDIDOS','CONV %','RESP. PROM.','CALIDAD','TOP PRODUCTO'].map(h=>
+              `<th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--gray);font-weight:700;letter-spacing:.5px">${h}</th>`
+            ).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${asesoras.map((a, i) => {
+            const perfil = vendedoras.find(v=>v.usuario===a.asesora);
+            const nombre = perfil?.nombre || a.asesora;
+            const conv   = a.conv_rate || 0;
+            const cc     = conv>=5?'var(--green)':conv>=2?'var(--amber)':'var(--red)';
+            const respColor = (a.tiempo_resp_prom||99)<=3?'var(--green)':(a.tiempo_resp_prom||99)<=8?'var(--amber)':'var(--red)';
+            const calColor  = (a.calidad_prom||0)>=80?'var(--green)':(a.calidad_prom||0)>=60?'var(--amber)':'var(--red)';
+            const topProd   = a.productos_top?.[0]?.prod || '—';
+            return `<tr style="border-bottom:1px solid var(--ltgray)">
+              <td style="padding:10px;font-weight:700;color:${vcols[i%vcols.length]}">${nombre}</td>
+              <td style="padding:10px">
+                <div style="display:flex;align-items:center;gap:6px">
+                  <div style="height:6px;width:${Math.round((a.total_chats||0)/maxChats*60)}px;background:${vcols[i%vcols.length]};border-radius:3px"></div>
+                  ${a.total_chats||0}
+                </div>
+              </td>
+              <td style="padding:10px;color:var(--purple);font-weight:700">${a.ventas||0}</td>
+              <td style="padding:10px;color:var(--amber);font-weight:600">${a.interesados||0}</td>
+              <td style="padding:10px;color:var(--red)">${a.perdidos||0}</td>
+              <td style="padding:10px;font-weight:800;color:${cc};font-size:14px">${conv}%</td>
+              <td style="padding:10px;font-weight:700;color:${respColor}">${a.tiempo_resp_prom||'—'}min</td>
+              <td style="padding:10px">
+                <div style="display:flex;align-items:center;gap:4px">
+                  <div style="height:6px;width:${(a.calidad_prom||0)*0.5}px;background:${calColor};border-radius:3px"></div>
+                  <span style="font-weight:700;color:${calColor}">${a.calidad_prom||'—'}</span>
+                </div>
+              </td>
+              <td style="padding:10px;font-size:11px;color:var(--gray)">${topProd}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>`;
+  } else {
+    document.getElementById('waAsesorasGrid').innerHTML = '<div style="padding:16px;color:var(--gray);font-size:12px;text-align:center">Sin conversaciones en este periodo</div>';
+  }
+
+  // ── PRODUCTOS NEGADOS ────────────────────────────────────────
+  const negados = d.productos_negados || [];
+  const maxN = negados[0]?.veces || 1;
+  document.getElementById('waProductosNegados').innerHTML = negados.length
+    ? negados.map(p => `
+        <div class="bar-item" style="margin-bottom:6px">
+          <div class="bar-name" title="${p.producto}" style="color:var(--red)">${p.producto}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${Math.round(p.veces/maxN*100)}%;background:var(--red)"></div></div>
+          <div class="bar-val" style="color:var(--red)">${p.veces}x</div>
+        </div>`).join('')
+    : '<div style="color:var(--gray);font-size:12px;padding:8px">Sin registros de productos negados</div>';
+
+  // ── PRODUCTOS SOLICITADOS ────────────────────────────────────
+  const solicitados = d.productos_solicitados || [];
+  const maxS = solicitados[0]?.veces || 1;
+  document.getElementById('waProductosSolicitados').innerHTML = solicitados.length
+    ? solicitados.map(p => `
+        <div class="bar-item" style="margin-bottom:6px">
+          <div class="bar-name" title="${p.producto}">${p.producto}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${Math.round(p.veces/maxS*100)}%;background:var(--teal)"></div></div>
+          <div class="bar-val">${p.veces}x</div>
+        </div>`).join('')
+    : '<div style="color:var(--gray);font-size:12px;padding:8px">Sin datos aún</div>';
+
+  // ── TENDENCIA ────────────────────────────────────────────────
+  const tend = d.tendencia_diaria || [];
+  if (tend.length) {
+    const maxC = Math.max(...tend.map(t=>t.chats||0), 1);
+    document.getElementById('waTendencia').innerHTML = `
+      <div style="display:flex;align-items:flex-end;gap:4px;height:70px">
+        ${tend.map(t => `
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+            <div style="font-size:9px;color:var(--teal);font-weight:700">${t.chats}</div>
+            <div style="width:100%;display:flex;flex-direction:column;align-items:stretch;gap:1px">
+              <div style="height:${Math.round((t.ventas||0)/maxC*50)}px;background:var(--purple);border-radius:2px 2px 0 0;min-height:${t.ventas?2:0}px" title="${t.ventas} ventas"></div>
+              <div style="height:${Math.round((t.chats-t.ventas)/maxC*50)}px;background:var(--teal);opacity:.5;min-height:2px" title="${t.chats} chats"></div>
+            </div>
+            <div style="font-size:8px;color:var(--gray)">${(t.fecha||'').substring(5)}</div>
+          </div>`).join('')}
+      </div>
+      <div style="display:flex;gap:12px;margin-top:6px;font-size:10px;color:var(--gray)">
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--teal);opacity:.5;border-radius:2px;margin-right:4px"></span>Chats</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--purple);border-radius:2px;margin-right:4px"></span>Ventas</span>
+      </div>`;
+  }
 }
 
 // ================================================================

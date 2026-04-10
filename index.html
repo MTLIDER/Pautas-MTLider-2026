@@ -2051,7 +2051,8 @@ async function cargarPipeline(contactoId, etapaActual) {
     if (nomData && nomData.length === 4) etNombres = nomData.map(n => n.valor);
   }
   const stagesEl = document.getElementById('pipelineStages');
-  const totalEtapas = Math.max(4, etNombres.length);
+  // Si hay template activo, mostrar solo sus etapas. Si no, mostrar 4 por default
+  const totalEtapas = templateIdActivo ? etNombres.length : 4;
   for (let e=1; e<=totalEtapas; e++) {
     const tasks = byEtapa[e];
     const done  = tasks.filter(t=>t.completado).length;
@@ -2211,7 +2212,7 @@ function mostrarTareasData(byEtapa, etapaActual, checks, contactoId, verEtapa=nu
 
   // Secciones agrupadas
   let html = `<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:10px;padding:0 2px">
-    ${ETAPA_NOMBRES[etapa-1]||('Etapa '+etapa)} ${isLocked?'<span style="color:var(--gray);font-weight:400">(bloqueada)</span>':''}
+    ${etNombres[etapa-1]||ETAPA_NOMBRES[etapa-1]||('Etapa '+etapa)} ${isLocked?'<span style="color:var(--gray);font-weight:400">(bloqueada)</span>':''}
   </div>` + bannerHtml;
 
   if (!isLocked) {

@@ -1906,8 +1906,9 @@ async function abrirContacto(row) {
     if (eFW) eFW.style.display = 'none';
     if (eVW) eVW.style.display = 'none';
   }
-  // Lada hint
-  autocompletarEstado(row.numero||'', 'eEstado', 'eladaHint');
+  // Lada hint — solo autodetectar si no hay estado guardado
+  if (!row.estado || row.estado === 'nan') autocompletarEstado(row.numero||'', 'eEstado', 'eladaHint');
+  else setEstadoSelect('eEstado', row.estado); // restaurar el estado guardado
   document.getElementById('ventaE').classList.remove('on');
   if (row.semaforo==='VENTA') {
     document.getElementById('ventaE').classList.add('on');

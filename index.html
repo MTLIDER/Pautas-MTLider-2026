@@ -2007,10 +2007,27 @@ async function cargarPipeline(contactoId, etapaActual) {
   const { data: checks } = await SB.from('etapas_checks')
     .select('*').eq('contacto_id',contactoId).order('etapa').order('orden');
   // Get recursos from tareas_template matching by tarea text
-  const { data: plantillas } = await SB.from('template_tareas')
+  // Detectar template activo desde las tareas
+  const templateIdActivoRecursos = (checks||[]).find(c => c.template_id)?.template_id;
+
+  // Cargar recursos: del template activo si existe, sino del pipeline default
+  let plantillasQuery = SB.from('template_tareas')
+    .select('id,tarea,recurso_url,recurso_tipo,recurso_nombre')
+    .eq('activo', true);
+  if (templateIdActivoRecursos) {
+    plantillasQuery = plantillasQuery.eq('template_id', templateIdActivoRecursos);
+  }
+  const { data: plantillas } = await plantillasQuery;
+
+  // También cargar recursos del pipeline default (tareas_template)
+  const { data: plantillasDefault } = await SB.from('tareas_template')
     .select('id,tarea,recurso_url,recurso_tipo,recurso_nombre').eq('activo',true);
+
   const plantillaMap = {};
-  (plantillas||[]).forEach(p => { plantillaMap[p.tarea] = p; });
+  // Primero agregar las del default, luego las del template (para que template tenga prioridad)
+  (plantillasDefault||[]).forEach(p => { if(p.recurso_url) plantillaMap[p.tarea] = p; });
+  (plantillas||[]).forEach(p => { if(p.recurso_url) plantillaMap[p.tarea] = p; });
+
   (checks||[]).forEach(ck => {
     const pl = plantillaMap[ck.tarea];
     if (pl) {

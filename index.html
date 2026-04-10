@@ -1769,18 +1769,12 @@ async function cargarMisRegistros(page=1) {
 // ── Cancelar campaña activa ─────────────────────────────────────
 async function confirmarCancelarCampana() {
   if (!_campanaActiva) return;
-  const borrarTareas = confirm(
-    `¿Cancelar la campaña "${_campanaActiva.nombre}"?\n\nClic en OK para cancelar Y borrar tareas futuras pendientes.\nClic en Cancelar para solo desactivar la campaña.`
-  );
-  // Si el usuario cancela el confirm completamente, no hacer nada
-  // confirm devuelve true (OK) o false (Cancelar) — ambos ejecutan la cancelación
-  // Para que el usuario pueda salir, usamos un segundo confirm
-  if (!confirm(`¿Confirmas que deseas cancelar la campaña "${_campanaActiva.nombre}"?`)) return;
+  if (!confirm(`¿Cancelar la campaña "${_campanaActiva.nombre}"?\n\nEsto borrará la campaña y todas sus tareas asociadas.`)) return;
 
   try {
     const { data, error } = await SB.rpc('cancelar_campana', {
       p_campana_id: _campanaActiva.id,
-      p_borrar_tareas: borrarTareas
+      p_borrar_tareas: true
     });
     if (error) throw error;
     toast(`✅ Campaña "${_campanaActiva.nombre}" cancelada`, 'ok');

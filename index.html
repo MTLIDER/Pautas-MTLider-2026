@@ -2126,6 +2126,20 @@ async function toggleTarea(tareaId, completadoActual, contactoId) {
   cargarPipeline(contactoId, ct?.etapa_actual || 1);
 }
 
+// ── Abrir recurso de tarea ───────────────────────────────────────
+async function abrirRecurso(tareaId, url, contactoId) {
+  if (!url) return;
+  // Abrir en nueva pestaña
+  window.open(url, '_blank');
+  // Marcar como abierto en BD
+  await SB.from('etapas_checks')
+    .update({ recurso_abierto: true, recurso_abierto_at: new Date().toISOString() })
+    .eq('id', tareaId);
+  // Refrescar pipeline para mostrar el ✓ abierto
+  const { data: ct } = await SB.from('contactos').select('etapa_actual').eq('id', contactoId).single();
+  cargarPipeline(contactoId, ct?.etapa_actual || 1);
+}
+
 function mostrarTareasData(byEtapa, etapaActual, checks, contactoId, verEtapa=null, etNombres=null, totalEtapas=4) {
   const etapa = verEtapa || etapaActual;
   const tasks = byEtapa[etapa] || [];

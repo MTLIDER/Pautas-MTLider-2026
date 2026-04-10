@@ -2027,8 +2027,16 @@ async function cargarPipeline(contactoId, etapaActual) {
   });
   if (!checks) return;
   // Agrupar por etapa
-  const byEtapa = {1:[],2:[],3:[],4:[]};
-  checks.forEach(c => { if(byEtapa[c.etapa]) byEtapa[c.etapa].push(c); });
+  // Inicializar byEtapa dinámicamente según las etapas reales de las tareas
+  const byEtapa = {};
+  checks.forEach(c => {
+    if (!byEtapa[c.etapa]) byEtapa[c.etapa] = [];
+    byEtapa[c.etapa].push(c);
+  });
+  // Asegurar que haya al menos las etapas 1-4 para el pipeline default
+  if (!Object.keys(byEtapa).length || !byEtapa[1]) {
+    [1,2,3,4].forEach(e => { if (!byEtapa[e]) byEtapa[e] = []; });
+  }
   // Render stage cards
   // Cargar nombres de etapas: del template si el contacto lo tiene, si no de listas_config
   let etNombres = ETAPA_NOMBRES;
@@ -2076,16 +2084,16 @@ async function cargarPipeline(contactoId, etapaActual) {
       </div>`);
   }
   // Show tasks for current stage by default
-  mostrarTareasData(byEtapa, etapaActual, checks, contactoId);
+  mostrarTareasData(byEtapa, etapaActual, checks, contactoId, null, etNombres, totalEtapas);
   // Render mini timeline
   renderTimeline(checks, stagesEl.parentElement);
-  window._pipelineData = {byEtapa, etapaActual, checks, contactoId};
+  window._pipelineData = {byEtapa, etapaActual, checks, contactoId, etNombres, totalEtapas};
 }
 
 function mostrarTareas(etapa) {
   if (!window._pipelineData) return;
-  const {byEtapa, etapaActual, checks, contactoId} = window._pipelineData;
-  mostrarTareasData(byEtapa, etapaActual, checks, contactoId, etapa);
+  const {byEtapa, etapaActual, checks, contactoId, etNombres, totalEtapas} = window._pipelineData;
+  mostrarTareasData(byEtapa, etapaActual, checks, contactoId, etapa, etNombres, totalEtapas);
 }
 
 
@@ -2107,7 +2115,7 @@ async function toggleTarea(tareaId, completadoActual, contactoId) {
   cargarPipeline(contactoId, ct?.etapa_actual || 1);
 }
 
-function mostrarTareasData(byEtapa, etapaActual, checks, contactoId, verEtapa=null) {
+function mostrarTareasData(byEtapa, etapaActual, checks, contactoId, verEtapa=null, etNombres=null, totalEtapas=4) {
   const etapa = verEtapa || etapaActual;
   const tasks = byEtapa[etapa] || [];
   const isLocked = etapa > etapaActual;

@@ -1118,6 +1118,7 @@ tr:hover td{background:#f9fafb}
       <button class="preset-btn" onclick="switchCampanaTab('hoy',this)" id="btnCampHoy">📅 Hoy</button>
       <button class="preset-btn" onclick="switchCampanaTab('agenda',this)">🗓 Agenda</button>
       <button class="preset-btn active" onclick="switchCampanaTab('crear',this)">➕ Nueva campana</button>
+      <button id="btnCancelarCampana" style="display:none;background:#fef2f2;color:#dc2626;border:1.5px solid #fca5a5;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer" onclick="confirmarCancelarCampana()">🚫 Cancelar campaña</button>
     </div>
 
     <!-- HOY -->
@@ -1763,6 +1764,34 @@ async function cargarMisRegistros(page=1) {
   document.getElementById('misSubTitle').textContent = `${count||0} contactos · pagina ${page}`;
   renderTabla('misContent', data||[], false);
   renderPager('misPager', count||0, page, cargarMisRegistros);
+}
+
+// ── Cancelar campaña activa ─────────────────────────────────────
+async function confirmarCancelarCampana() {
+  if (!_campanaActiva) return;
+  const borrarTareas = confirm(
+    `¿Cancelar la campaña "${_campanaActiva.nombre}"?\n\nClic en OK para cancelar Y borrar tareas futuras pendientes.\nClic en Cancelar para solo desactivar la campaña.`
+  );
+  // Si el usuario cancela el confirm completamente, no hacer nada
+  // confirm devuelve true (OK) o false (Cancelar) — ambos ejecutan la cancelación
+  // Para que el usuario pueda salir, usamos un segundo confirm
+  if (!confirm(`¿Confirmas que deseas cancelar la campaña "${_campanaActiva.nombre}"?`)) return;
+
+  try {
+    const { data, error } = await SB.rpc('cancelar_campana', {
+      p_campana_id: _campanaActiva.id,
+      p_borrar_tareas: borrarTareas
+    });
+    if (error) throw error;
+    toast(`✅ Campaña "${_campanaActiva.nombre}" cancelada`, 'ok');
+    _campanaActiva = null;
+    document.getElementById('btnCancelarCampana').style.display = 'none';
+    // Volver a tab de crear
+    switchCampanaTab('crear', document.querySelector('#campanaTabs .preset-btn:last-of-type'));
+    await cargarCampanas();
+  } catch(e) {
+    toast('Error: ' + e.message, 'err');
+  }
 }
 
 // ── Sincronizar contactos de campaña → etapas_checks ────────────
@@ -3031,13 +3060,17 @@ async function cargarCampanas() {
   iniciarSelectorPipeline();
   const {data} = await SB.from('campanas').select('*').eq('activa',true).order('created_at',{ascending:false}).limit(1);
   _campanaActiva = data?.[0]||null;
+  const btnCancelar = document.getElementById('btnCancelarCampana');
   if (_campanaActiva) {
     document.querySelectorAll('#campanaTabs .preset-btn').forEach(b=>b.classList.remove('active'));
     if(btnHoy) btnHoy.classList.add('active');
     if(tabHoy)    tabHoy.style.display    = 'block';
     if(tabAgenda) tabAgenda.style.display = 'none';
     if(tabCrear)  tabCrear.style.display  = 'none';
+    if(btnCancelar) btnCancelar.style.display = 'inline-block';
     cargarHoyCampana();
+  } else {
+    if(btnCancelar) btnCancelar.style.display = 'none';
   }
 }
 
@@ -3253,7 +3286,8 @@ async function crearCampana() {
     p_nombre:nombre,p_descripcion:desc||null,p_inicio:inicio,
     p_origen_desde:desde,p_origen_hasta:hasta,p_semaforos:sems,
     p_dias_habiles:diasHab,p_usuario:SESSION.usuario,
-    p_origen_contactos:campOrigen
+    p_origen_contactos:campOrigen,
+    p_template_id: parseInt(document.getElementById('cnTemplate')?.value)||null
   });
   if(error){toast('Error: '+error.message,'err');return;}
   if(!data?.ok){toast('Error al crear','err');return;}

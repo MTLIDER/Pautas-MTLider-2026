@@ -1708,7 +1708,22 @@ async function cargarMisRegistros(page=1) {
     if (_misFiltro === 'pendientes') tQuery = tQuery.lt('fecha_programada', hoyStr);
     if (_misFiltro === 'semana')     tQuery = tQuery.gte('fecha_programada', lunStr).lte('fecha_programada', domStr);
     const {data: tData} = await tQuery;
-    contactIdsFiltro = [...new Set((tData||[]).map(t => t.contacto_id))];
+    const idsChecks = new Set((tData||[]).map(t => t.contacto_id));
+
+    // ── EXTRA: incluir contactos de campaña activa para hoy ─────
+    // aunque no tengan tarea en etapas_checks todavía
+    if (_misFiltro === 'hoy') {
+      try {
+        const {data: campHoy} = await SB.from('campana_contactos')
+          .select('contacto_id, campanas!inner(activa), contactos!inner(vendedora)')
+          .eq('fecha_activacion', hoyStr)
+          .eq('campanas.activa', true)
+          .eq('contactos.vendedora', SESSION.usuario);
+        (campHoy||[]).forEach(r => idsChecks.add(r.contacto_id));
+      } catch(e) { /* ignorar si falla */ }
+    }
+
+    contactIdsFiltro = [...idsChecks];
   }
 
   let query = SB.from('contactos').select('*',{count:'exact'})
@@ -1720,14 +1735,22 @@ async function cargarMisRegistros(page=1) {
   if (contactIdsFiltro !== null) {
     if (!contactIdsFiltro.length) {
       // No hay contactos con tareas en este periodo
+      const btnSync = _misFiltro === 'hoy'
+        ? `<button class="btn-sm primary" style="margin-top:14px" onclick="sincronizarCampanaHoy()">
+             🔄 Sincronizar contactos de campaña
+           </button>
+           <div style="font-size:11px;margin-top:8px;color:#9ca3af">
+             Si tienes una campaña activa para hoy, esto traerá esos contactos.
+           </div>`
+        : '';
       document.getElementById('misContent').innerHTML = `
         <div style="text-align:center;padding:40px;color:var(--gray)">
           <div style="font-size:36px;margin-bottom:12px">${_misFiltro==='hoy'?'✅':'📭'}</div>
           <div style="font-size:14px;font-weight:700;margin-bottom:6px">
             ${_misFiltro==='hoy'?'Sin tareas para hoy 🎉':_misFiltro==='pendientes'?'Sin tareas vencidas':'Sin tareas esta semana'}
           </div>
-          <div style="font-size:12px">${_misFiltro==='hoy'?'Todas las tareas de hoy estan completadas o aun no tienes contactos':''}
-          </div>
+          <div style="font-size:12px">${_misFiltro==='hoy'?'Todas las tareas de hoy están completadas o aún no tienes contactos':''}</div>
+          ${btnSync}
         </div>`;
       document.getElementById('misPager').innerHTML = '';
       document.getElementById('misSubTitle').textContent = '0 contactos';
@@ -1740,6 +1763,22 @@ async function cargarMisRegistros(page=1) {
   document.getElementById('misSubTitle').textContent = `${count||0} contactos · pagina ${page}`;
   renderTabla('misContent', data||[], false);
   renderPager('misPager', count||0, page, cargarMisRegistros);
+}
+
+// ── Sincronizar contactos de campaña → etapas_checks ────────────
+async function sincronizarCampanaHoy() {
+  const btn = event?.target;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Sincronizando...'; }
+  try {
+    const { data, error } = await SB.rpc('sincronizar_campana_hoy');
+    if (error) throw error;
+    const n = data?.tareas_creadas ?? 0;
+    showToast(n > 0 ? `✅ ${n} tareas de campaña sincronizadas` : 'ℹ️ No hay nuevos contactos de campaña para hoy', n > 0 ? 'success' : 'info');
+    cargarMisRegistros(1);
+  } catch(e) {
+    showToast('Error al sincronizar: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Sincronizar contactos de campaña'; }
+  }
 }
 
 // ================================================================

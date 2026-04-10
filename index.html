@@ -2088,6 +2088,25 @@ function mostrarTareas(etapa) {
   mostrarTareasData(byEtapa, etapaActual, checks, contactoId, etapa);
 }
 
+
+// ── Completar / descompletar tarea de pipeline ───────────────────
+async function toggleTarea(tareaId, completadoActual, contactoId) {
+  const nuevoEstado = !completadoActual;
+  const updates = {
+    completado:     nuevoEstado,
+    completado_at:  nuevoEstado ? new Date().toISOString() : null,
+    completado_por: nuevoEstado ? (SESSION?.usuario || 'asesora') : null
+  };
+  const { error } = await SB.from('etapas_checks')
+    .update(updates)
+    .eq('id', tareaId);
+  if (error) { toast('Error al actualizar tarea: ' + error.message, 'err'); return; }
+  toast(nuevoEstado ? '✅ Tarea completada' : 'Tarea desmarcada', nuevoEstado ? 'ok' : 'info');
+  // Recargar pipeline del contacto
+  const { data: ct } = await SB.from('contactos').select('etapa_actual').eq('id', contactoId).single();
+  cargarPipeline(contactoId, ct?.etapa_actual || 1);
+}
+
 function mostrarTareasData(byEtapa, etapaActual, checks, contactoId, verEtapa=null) {
   const etapa = verEtapa || etapaActual;
   const tasks = byEtapa[etapa] || [];

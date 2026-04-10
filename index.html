@@ -2030,11 +2030,30 @@ async function cargarPipeline(contactoId, etapaActual) {
   const byEtapa = {1:[],2:[],3:[],4:[]};
   checks.forEach(c => { if(byEtapa[c.etapa]) byEtapa[c.etapa].push(c); });
   // Render stage cards
-  // Load stage names from config
-  const {data:nomData} = await SB.from('listas_config').select('valor,orden').eq('tipo','ETAPA_NOMBRE').order('orden');
-  const etNombres = nomData && nomData.length===4 ? nomData.map(n=>n.valor) : ETAPA_NOMBRES;
+  // Cargar nombres de etapas: del template si el contacto lo tiene, si no de listas_config
+  let etNombres = ETAPA_NOMBRES;
+  const templateIdActivo = checks.find(c => c.template_id)?.template_id;
+  if (templateIdActivo) {
+    // Obtener nombres de etapas del template personalizado
+    const {data:tplEtapas} = await SB.from('template_tareas')
+      .select('etapa, etapa_nombre')
+      .eq('template_id', templateIdActivo)
+      .not('etapa_nombre', 'is', null)
+      .order('etapa');
+    if (tplEtapas && tplEtapas.length) {
+      // Construir mapa de etapa → nombre, sin duplicados
+      const etapaMap = {};
+      tplEtapas.forEach(t => { if (t.etapa_nombre) etapaMap[t.etapa] = t.etapa_nombre; });
+      const maxEtapa = Math.max(...Object.keys(etapaMap).map(Number));
+      etNombres = Array.from({length: maxEtapa}, (_, i) => etapaMap[i+1] || ETAPA_NOMBRES[i] || ('Etapa ' + (i+1)));
+    }
+  } else {
+    const {data:nomData} = await SB.from('listas_config').select('valor,orden').eq('tipo','ETAPA_NOMBRE').order('orden');
+    if (nomData && nomData.length === 4) etNombres = nomData.map(n => n.valor);
+  }
   const stagesEl = document.getElementById('pipelineStages');
-  for (let e=1; e<=4; e++) {
+  const totalEtapas = Math.max(4, etNombres.length);
+  for (let e=1; e<=totalEtapas; e++) {
     const tasks = byEtapa[e];
     const done  = tasks.filter(t=>t.completado).length;
     const total = tasks.length;

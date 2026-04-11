@@ -4557,6 +4557,8 @@ async function cargarBitacora() {
     <div style="margin-top:8px;font-size:10px;color:var(--gray);text-align:right">
       Mostrando ${data.length} eventos · Los eventos se ordenan del mas reciente al mas antiguo
     </div>`;
+  if (el1) el1.innerHTML = html;
+  if (el2) el2.innerHTML = html;
 }
 
 

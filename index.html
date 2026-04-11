@@ -2020,13 +2020,8 @@ async function cargarPipeline(contactoId, etapaActual) {
   }
   const { data: plantillas } = await plantillasQuery;
 
-  // También cargar recursos del pipeline default (tareas_template)
-  const { data: plantillasDefault } = await SB.from('tareas_template')
-    .select('id,tarea,recurso_url,recurso_tipo,recurso_nombre').eq('activo',true);
-
   const plantillaMap = {};
-  // Primero agregar las del default, luego las del template (para que template tenga prioridad)
-  (plantillasDefault||[]).forEach(p => { if(p.recurso_url) plantillaMap[p.tarea] = p; });
+  // Agregar recursos del template activo
   (plantillas||[]).forEach(p => { if(p.recurso_url) plantillaMap[p.tarea] = p; });
 
   (checks||[]).forEach(ck => {

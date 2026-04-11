@@ -1935,13 +1935,13 @@ function switchModalTab(tab) {
 async function registrarBitacora(contactoId, folio, tipo, descripcion, valorAntes=null, valorDespues=null) {
   try {
     await SB.from('bitacora_eventos').insert({
-      contacto_id:   contactoId,
-      folio:         folio,
-      tipo:          tipo,
-      descripcion:   descripcion,
-      valor_antes:   valorAntes,
-      valor_despues: valorDespues,
-      usuario:       SESSION.usuario  // siempre el usuario logueado
+      contacto_id: contactoId,
+      folio:       folio,
+      tipo:        tipo,
+      descripcion: descripcion,
+      datos_antes: valorAntes,
+      datos_nuevo: valorDespues,
+      usuario:     SESSION.usuario
     });
   } catch(e) { console.warn('Bitácora error:', e.message); }
 }

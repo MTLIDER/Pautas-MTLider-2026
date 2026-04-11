@@ -3552,6 +3552,7 @@ async function verificarDuplicado(numero) {
     .eq('numero', numero)
     .limit(1);
 
+  console.log('bitacora data:', data, 'length:', data?.length, 'isArray:', Array.isArray(data));
   if (!data || !data.length) { ocultarDuplicado(); return; }
 
   const dup = data[0];

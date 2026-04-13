@@ -1118,6 +1118,7 @@ tr:hover td{background:#f9fafb}
       <button class="preset-btn" onclick="switchCampanaTab('hoy',this)" id="btnCampHoy">📅 Hoy</button>
       <button class="preset-btn" onclick="switchCampanaTab('agenda',this)">🗓 Agenda</button>
       <button class="preset-btn active" onclick="switchCampanaTab('crear',this)">➕ Nueva campana</button>
+      <button id="btnCancelarCampana" style="display:none;background:#fef2f2;color:#dc2626;border:1.5px solid #fca5a5;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer" onclick="confirmarCancelarCampana()">🚫 Cancelar campaña</button>
     </div>
 
     <!-- HOY -->
@@ -1708,7 +1709,22 @@ async function cargarMisRegistros(page=1) {
     if (_misFiltro === 'pendientes') tQuery = tQuery.lt('fecha_programada', hoyStr);
     if (_misFiltro === 'semana')     tQuery = tQuery.gte('fecha_programada', lunStr).lte('fecha_programada', domStr);
     const {data: tData} = await tQuery;
-    contactIdsFiltro = [...new Set((tData||[]).map(t => t.contacto_id))];
+    const idsChecks = new Set((tData||[]).map(t => t.contacto_id));
+
+    // ── EXTRA: incluir contactos de campaña activa para hoy ─────
+    // aunque no tengan tarea en etapas_checks todavía
+    if (_misFiltro === 'hoy') {
+      try {
+        const {data: campHoy} = await SB.from('campana_contactos')
+          .select('contacto_id, campanas!inner(activa), contactos!inner(vendedora)')
+          .eq('fecha_activacion', hoyStr)
+          .eq('campanas.activa', true)
+          .eq('contactos.vendedora', SESSION.usuario);
+        (campHoy||[]).forEach(r => idsChecks.add(r.contacto_id));
+      } catch(e) { /* ignorar si falla */ }
+    }
+
+    contactIdsFiltro = [...idsChecks];
   }
 
   let query = SB.from('contactos').select('*',{count:'exact'})
@@ -1720,14 +1736,22 @@ async function cargarMisRegistros(page=1) {
   if (contactIdsFiltro !== null) {
     if (!contactIdsFiltro.length) {
       // No hay contactos con tareas en este periodo
+      const btnSync = _misFiltro === 'hoy'
+        ? `<button class="btn-sm primary" style="margin-top:14px" onclick="sincronizarCampanaHoy()">
+             🔄 Sincronizar contactos de campaña
+           </button>
+           <div style="font-size:11px;margin-top:8px;color:#9ca3af">
+             Si tienes una campaña activa para hoy, esto traerá esos contactos.
+           </div>`
+        : '';
       document.getElementById('misContent').innerHTML = `
         <div style="text-align:center;padding:40px;color:var(--gray)">
           <div style="font-size:36px;margin-bottom:12px">${_misFiltro==='hoy'?'✅':'📭'}</div>
           <div style="font-size:14px;font-weight:700;margin-bottom:6px">
             ${_misFiltro==='hoy'?'Sin tareas para hoy 🎉':_misFiltro==='pendientes'?'Sin tareas vencidas':'Sin tareas esta semana'}
           </div>
-          <div style="font-size:12px">${_misFiltro==='hoy'?'Todas las tareas de hoy estan completadas o aun no tienes contactos':''}
-          </div>
+          <div style="font-size:12px">${_misFiltro==='hoy'?'Todas las tareas de hoy están completadas o aún no tienes contactos':''}</div>
+          ${btnSync}
         </div>`;
       document.getElementById('misPager').innerHTML = '';
       document.getElementById('misSubTitle').textContent = '0 contactos';
@@ -1740,6 +1764,44 @@ async function cargarMisRegistros(page=1) {
   document.getElementById('misSubTitle').textContent = `${count||0} contactos · pagina ${page}`;
   renderTabla('misContent', data||[], false);
   renderPager('misPager', count||0, page, cargarMisRegistros);
+}
+
+// ── Cancelar campaña activa ─────────────────────────────────────
+async function confirmarCancelarCampana() {
+  if (!_campanaActiva) return;
+  if (!confirm(`¿Cancelar la campaña "${_campanaActiva.nombre}"?\n\nEsto borrará la campaña y todas sus tareas asociadas.`)) return;
+
+  try {
+    const { data, error } = await SB.rpc('cancelar_campana', {
+      p_campana_id: _campanaActiva.id,
+      p_borrar_tareas: true
+    });
+    if (error) throw error;
+    toast(`✅ Campaña "${_campanaActiva.nombre}" cancelada`, 'ok');
+    _campanaActiva = null;
+    document.getElementById('btnCancelarCampana').style.display = 'none';
+    // Volver a tab de crear
+    switchCampanaTab('crear', document.querySelector('#campanaTabs .preset-btn:last-of-type'));
+    await cargarCampanas();
+  } catch(e) {
+    toast('Error: ' + e.message, 'err');
+  }
+}
+
+// ── Sincronizar contactos de campaña → etapas_checks ────────────
+async function sincronizarCampanaHoy() {
+  const btn = event?.target;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Sincronizando...'; }
+  try {
+    const { data, error } = await SB.rpc('sincronizar_campana_hoy');
+    if (error) throw error;
+    const n = data?.tareas_creadas ?? 0;
+    showToast(n > 0 ? `✅ ${n} tareas de campaña sincronizadas` : 'ℹ️ No hay nuevos contactos de campaña para hoy', n > 0 ? 'success' : 'info');
+    cargarMisRegistros(1);
+  } catch(e) {
+    showToast('Error al sincronizar: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Sincronizar contactos de campaña'; }
+  }
 }
 
 // ================================================================
@@ -1821,6 +1883,7 @@ let nvContactoId=null, nvNumero=null, nvNombre=null;
 
 async function abrirContacto(row) {
   editingId = row.id; editVend = row.vendedora; window._editingEstado = row.estado;
+  window._editingRow = row; // guardar estado previo para bitácora
   document.getElementById('cModalSub').textContent = `ID: ${row.folio||row.id.substring(0,8)} · ${row.vendedora}`;
   const sv = (id,v) => { const e=document.getElementById(id); if(e) e.value=(v&&v!='nan')?v:''; };
   sv('eNumero',row.numero); sv('eNombre',row.nombre); sv('eEstado',row.estado);
@@ -1844,8 +1907,9 @@ async function abrirContacto(row) {
     if (eFW) eFW.style.display = 'none';
     if (eVW) eVW.style.display = 'none';
   }
-  // Lada hint
-  autocompletarEstado(row.numero||'', 'eEstado', 'eladaHint');
+  // Lada hint — solo autodetectar si no hay estado guardado
+  if (!row.estado || row.estado === 'nan') autocompletarEstado(row.numero||'', 'eEstado', 'eladaHint');
+  else setEstadoSelect('eEstado', row.estado); // restaurar el estado guardado
   document.getElementById('ventaE').classList.remove('on');
   if (row.semaforo==='VENTA') {
     document.getElementById('ventaE').classList.add('on');
@@ -1865,6 +1929,21 @@ function switchModalTab(tab) {
     document.getElementById('mPanel'+t.charAt(0).toUpperCase()+t.slice(1)).style.display = t===tab?'block':'none';
     document.getElementById('mTab'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('active', t===tab);
   });
+}
+
+// ── Registrar evento en bitácora con usuario actual ─────────────
+async function registrarBitacora(contactoId, folio, tipo, descripcion, valorAntes=null, valorDespues=null) {
+  try {
+    await SB.from('bitacora_eventos').insert({
+      contacto_id: contactoId,
+      folio:       folio,
+      tipo:        tipo,
+      descripcion: descripcion,
+      datos_antes: valorAntes,
+      datos_nuevo: valorDespues,
+      usuario:     SESSION.usuario
+    });
+  } catch(e) { console.warn('Bitácora error:', e.message); }
 }
 
 async function guardarEdicion() {
@@ -1913,6 +1992,18 @@ async function guardarEdicion() {
         });
       }
     }
+    // Registrar cambios en bitácora con SESSION.usuario
+    const prev = window._editingRow || {};
+    const folio = prev.folio || null;
+    if (prev.semaforo && prev.semaforo !== sem) {
+      await registrarBitacora(editingId, folio, 'semaforo', 'Cambio de semáforo', prev.semaforo, sem);
+    }
+    if (adminVend && adminVend !== prev.vendedora) {
+      await registrarBitacora(editingId, folio, 'reasignacion', `Reasignado: ${prev.vendedora} → ${adminVend}`, prev.vendedora, adminVend);
+    }
+    if (updates.notas && updates.notas !== prev.notas) {
+      await registrarBitacora(editingId, folio, 'nota', 'Nota actualizada');
+    }
     toast('✅ Actualizado.','ok');
     cerrarModal('contacto');
     if (document.getElementById('panel-todos')?.classList.contains('active')) cargarTodos(todosPage);
@@ -1931,7 +2022,7 @@ async function eliminarContacto() {
   if (document.getElementById('panel-misregistros')?.classList.contains('active')) cargarMisRegistros(misPage);
 }
 
-document.getElementById('contactoModal').addEventListener('click',function(e){if(e.target===this)cerrarModal('contacto');});
+document.getElementById('contactoModal').addEventListener('click',function(e){if(e.target===this && !window.getSelection()?.toString())cerrarModal('contacto');});
 
 // ================================================================
 // PIPELINE — etapas y tareas
@@ -1939,15 +2030,28 @@ document.getElementById('contactoModal').addEventListener('click',function(e){if
 const ETAPA_NOMBRES = ['Primer Contacto','Seguimiento Activo','Cierre','Postventa'];
 
 async function cargarPipeline(contactoId, etapaActual) {
+  etapaActual = etapaActual || 1; // null/undefined → etapa 1
   document.getElementById('pipelineTasks').innerHTML='<div class="loading"><div class="sp"></div></div>';
   document.getElementById('pipelineStages').innerHTML='';
   const { data: checks } = await SB.from('etapas_checks')
     .select('*').eq('contacto_id',contactoId).order('etapa').order('orden');
   // Get recursos from tareas_template matching by tarea text
-  const { data: plantillas } = await SB.from('tareas_template')
-    .select('id,tarea,recurso_url,recurso_tipo,recurso_nombre').eq('activo',true);
+  // Detectar template activo desde las tareas
+  const templateIdActivoRecursos = (checks||[]).find(c => c.template_id)?.template_id;
+
+  // Cargar recursos: del template activo si existe, sino del pipeline default
+  let plantillasQuery = SB.from('template_tareas')
+    .select('id,tarea,recurso_url,recurso_tipo,recurso_nombre')
+    .eq('activo', true);
+  if (templateIdActivoRecursos) {
+    plantillasQuery = plantillasQuery.eq('template_id', templateIdActivoRecursos);
+  }
+  const { data: plantillas } = await plantillasQuery;
+
   const plantillaMap = {};
-  (plantillas||[]).forEach(p => { plantillaMap[p.tarea] = p; });
+  // Agregar recursos del template activo
+  (plantillas||[]).forEach(p => { if(p.recurso_url) plantillaMap[p.tarea] = p; });
+
   (checks||[]).forEach(ck => {
     const pl = plantillaMap[ck.tarea];
     if (pl) {
@@ -1958,14 +2062,41 @@ async function cargarPipeline(contactoId, etapaActual) {
   });
   if (!checks) return;
   // Agrupar por etapa
-  const byEtapa = {1:[],2:[],3:[],4:[]};
-  checks.forEach(c => { if(byEtapa[c.etapa]) byEtapa[c.etapa].push(c); });
+  // Inicializar byEtapa dinámicamente según las etapas reales de las tareas
+  const byEtapa = {};
+  checks.forEach(c => {
+    if (!byEtapa[c.etapa]) byEtapa[c.etapa] = [];
+    byEtapa[c.etapa].push(c);
+  });
+  // Asegurar que haya al menos las etapas 1-4 para el pipeline default
+  if (!Object.keys(byEtapa).length || !byEtapa[1]) {
+    [1,2,3,4].forEach(e => { if (!byEtapa[e]) byEtapa[e] = []; });
+  }
   // Render stage cards
-  // Load stage names from config
-  const {data:nomData} = await SB.from('listas_config').select('valor,orden').eq('tipo','ETAPA_NOMBRE').order('orden');
-  const etNombres = nomData && nomData.length===4 ? nomData.map(n=>n.valor) : ETAPA_NOMBRES;
+  // Cargar nombres de etapas: del template si el contacto lo tiene, si no de listas_config
+  let etNombres = ETAPA_NOMBRES;
+  const templateIdActivo = checks.find(c => c.template_id)?.template_id;
+  if (templateIdActivo) {
+    // Obtener nombres de etapas del template personalizado
+    const {data:tplEtapas} = await SB.from('template_tareas')
+      .select('etapa, etapa_nombre')
+      .eq('template_id', templateIdActivo)
+      .order('etapa');
+    if (tplEtapas && tplEtapas.length) {
+      // Construir mapa de etapa → nombre, sin duplicados
+      const etapaMap = {};
+      tplEtapas.forEach(t => { if (t.etapa_nombre) etapaMap[t.etapa] = t.etapa_nombre; });
+      const maxEtapa = Math.max(...Object.keys(etapaMap).map(Number));
+      etNombres = Array.from({length: maxEtapa}, (_, i) => etapaMap[i+1] || ETAPA_NOMBRES[i] || ('Etapa ' + (i+1)));
+    }
+  } else {
+    const {data:nomData} = await SB.from('listas_config').select('valor,orden').eq('tipo','ETAPA_NOMBRE').order('orden');
+    if (nomData && nomData.length === 4) etNombres = nomData.map(n => n.valor);
+  }
   const stagesEl = document.getElementById('pipelineStages');
-  for (let e=1; e<=4; e++) {
+  // Si hay template activo, mostrar solo sus etapas. Si no, mostrar 4 por default
+  const totalEtapas = templateIdActivo ? etNombres.length : 4;
+  for (let e=1; e<=totalEtapas; e++) {
     const tasks = byEtapa[e];
     const done  = tasks.filter(t=>t.completado).length;
     const total = tasks.length;
@@ -1988,19 +2119,57 @@ async function cargarPipeline(contactoId, etapaActual) {
       </div>`);
   }
   // Show tasks for current stage by default
-  mostrarTareasData(byEtapa, etapaActual, checks, contactoId);
+  mostrarTareasData(byEtapa, etapaActual, checks, contactoId, null, etNombres, totalEtapas);
   // Render mini timeline
   renderTimeline(checks, stagesEl.parentElement);
-  window._pipelineData = {byEtapa, etapaActual, checks, contactoId};
+  window._pipelineData = {byEtapa, etapaActual, checks, contactoId, etNombres, totalEtapas};
 }
 
 function mostrarTareas(etapa) {
   if (!window._pipelineData) return;
-  const {byEtapa, etapaActual, checks, contactoId} = window._pipelineData;
-  mostrarTareasData(byEtapa, etapaActual, checks, contactoId, etapa);
+  const {byEtapa, etapaActual, checks, contactoId, etNombres, totalEtapas} = window._pipelineData;
+  mostrarTareasData(byEtapa, etapaActual, checks, contactoId, etapa, etNombres, totalEtapas);
 }
 
-function mostrarTareasData(byEtapa, etapaActual, checks, contactoId, verEtapa=null) {
+
+// ── Completar / descompletar tarea de pipeline ───────────────────
+async function toggleTarea(tareaId, completadoActual, contactoId) {
+  const nuevoEstado = !completadoActual;
+  const updates = {
+    completado:     nuevoEstado,
+    completado_at:  nuevoEstado ? new Date().toISOString() : null,
+    completado_por: nuevoEstado ? (SESSION?.usuario || 'asesora') : null
+  };
+  const { error } = await SB.from('etapas_checks')
+    .update(updates)
+    .eq('id', tareaId);
+  if (error) { toast('Error al actualizar tarea: ' + error.message, 'err'); return; }
+  toast(nuevoEstado ? '✅ Tarea completada' : 'Tarea desmarcada', nuevoEstado ? 'ok' : 'info');
+  // Registrar en bitácora
+  if (nuevoEstado) {
+    const { data: ck } = await SB.from('etapas_checks').select('tarea, contactos(folio)').eq('id', tareaId).single();
+    await registrarBitacora(contactoId, ck?.contactos?.folio, 'tarea', 'Tarea completada: ' + (ck?.tarea||''));
+  }
+  // Recargar pipeline del contacto
+  const { data: ct } = await SB.from('contactos').select('etapa_actual').eq('id', contactoId).single();
+  cargarPipeline(contactoId, ct?.etapa_actual || 1);
+}
+
+// ── Abrir recurso de tarea ───────────────────────────────────────
+async function abrirRecurso(tareaId, url, contactoId) {
+  if (!url) return;
+  // Abrir en nueva pestaña
+  window.open(url, '_blank');
+  // Marcar como abierto en BD
+  await SB.from('etapas_checks')
+    .update({ recurso_abierto: true, recurso_abierto_at: new Date().toISOString() })
+    .eq('id', tareaId);
+  // Refrescar pipeline para mostrar el ✓ abierto
+  const { data: ct } = await SB.from('contactos').select('etapa_actual').eq('id', contactoId).single();
+  cargarPipeline(contactoId, ct?.etapa_actual || 1);
+}
+
+function mostrarTareasData(byEtapa, etapaActual, checks, contactoId, verEtapa=null, etNombres=null, totalEtapas=4) {
   const etapa = verEtapa || etapaActual;
   const tasks = byEtapa[etapa] || [];
   const isLocked = etapa > etapaActual;
@@ -2105,7 +2274,7 @@ function mostrarTareasData(byEtapa, etapaActual, checks, contactoId, verEtapa=nu
 
   // Secciones agrupadas
   let html = `<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:10px;padding:0 2px">
-    ${ETAPA_NOMBRES[etapa-1]||('Etapa '+etapa)} ${isLocked?'<span style="color:var(--gray);font-weight:400">(bloqueada)</span>':''}
+    ${etNombres[etapa-1]||ETAPA_NOMBRES[etapa-1]||('Etapa '+etapa)} ${isLocked?'<span style="color:var(--gray);font-weight:400">(bloqueada)</span>':''}
   </div>` + bannerHtml;
 
   if (!isLocked) {
@@ -2141,6 +2310,9 @@ async function avanzarEtapa(contactoId) {
   if (error) { toast(error.message,'err'); return; }
   if (!data.ok) { toast(data.msg,'err'); return; }
   toast(`✅ ${data.msg}`,'ok');
+  // Registrar en bitácora
+  const { data: ctBit } = await SB.from('contactos').select('folio, etapa_actual').eq('id', contactoId).single();
+  await registrarBitacora(contactoId, ctBit?.folio, 'etapa', 'Avance de etapa → Etapa ' + (data.nueva_etapa || ''));
   const { data:contacto } = await SB.from('contactos').select('etapa_actual').eq('id',contactoId).single();
   cargarPipeline(contactoId, contacto?.etapa_actual||1);
 }
@@ -2991,13 +3163,17 @@ async function cargarCampanas() {
   iniciarSelectorPipeline();
   const {data} = await SB.from('campanas').select('*').eq('activa',true).order('created_at',{ascending:false}).limit(1);
   _campanaActiva = data?.[0]||null;
+  const btnCancelar = document.getElementById('btnCancelarCampana');
   if (_campanaActiva) {
     document.querySelectorAll('#campanaTabs .preset-btn').forEach(b=>b.classList.remove('active'));
     if(btnHoy) btnHoy.classList.add('active');
     if(tabHoy)    tabHoy.style.display    = 'block';
     if(tabAgenda) tabAgenda.style.display = 'none';
     if(tabCrear)  tabCrear.style.display  = 'none';
+    if(btnCancelar) btnCancelar.style.display = 'inline-block';
     cargarHoyCampana();
+  } else {
+    if(btnCancelar) btnCancelar.style.display = 'none';
   }
 }
 
@@ -3213,7 +3389,8 @@ async function crearCampana() {
     p_nombre:nombre,p_descripcion:desc||null,p_inicio:inicio,
     p_origen_desde:desde,p_origen_hasta:hasta,p_semaforos:sems,
     p_dias_habiles:diasHab,p_usuario:SESSION.usuario,
-    p_origen_contactos:campOrigen
+    p_origen_contactos:campOrigen,
+    p_template_id: parseInt(document.getElementById('cnTemplate')?.value)||null
   });
   if(error){toast('Error: '+error.message,'err');return;}
   if(!data?.ok){toast('Error al crear','err');return;}
@@ -3411,6 +3588,7 @@ async function verificarDuplicado(numero) {
     .eq('numero', numero)
     .limit(1);
 
+  console.log('bitacora data:', data, 'length:', data?.length, 'isArray:', Array.isArray(data));
   if (!data || !data.length) { ocultarDuplicado(); return; }
 
   const dup = data[0];
@@ -4416,6 +4594,8 @@ async function cargarBitacora() {
     <div style="margin-top:8px;font-size:10px;color:var(--gray);text-align:right">
       Mostrando ${data.length} eventos · Los eventos se ordenan del mas reciente al mas antiguo
     </div>`;
+  if (el1) el1.innerHTML = html;
+  if (el2) el2.innerHTML = html;
 }
 
 

@@ -4689,7 +4689,18 @@ function renderTplEditor() {
           oninput="actualizarNombreEtapa(${ei},this.value)"
           style="flex:1;border:none;background:none;font-size:13px;font-weight:700;color:var(--dark);outline:none"
           placeholder="Nombre de la etapa...">
-        <button onclick="eliminarEtapaTpl(${ei})" style="border:none;background:none;cursor:pointer;color:var(--red);font-size:13px;padding:2px 6px">✕</button>
+        <div style="display:flex;gap:2px;margin-left:4px">
+          <button onclick="moverEtapaTpl(${ei},-1)" title="Subir etapa"
+            style="border:1px solid var(--border);background:#f8fafc;border-radius:5px;cursor:pointer;padding:2px 6px;font-size:12px"
+            ${ei===0?'disabled':''}>↑</button>
+          <button onclick="moverEtapaTpl(${ei},1)" title="Bajar etapa"
+            style="border:1px solid var(--border);background:#f8fafc;border-radius:5px;cursor:pointer;padding:2px 6px;font-size:12px"
+            ${ei===_tplEtapas.length-1?'disabled':''}>↓</button>
+          <button onclick="insertarEtapaAntes(${ei})" title="Insertar etapa antes"
+            style="border:1px solid var(--teal);background:#e0f7ff;color:var(--teal);border-radius:5px;cursor:pointer;padding:2px 6px;font-size:11px;font-weight:700">+E</button>
+          <button onclick="eliminarEtapaTpl(${ei})"
+            style="border:none;background:none;cursor:pointer;color:var(--red);font-size:13px;padding:2px 6px">✕</button>
+        </div>
       </div>
       <div class="etapa-editor-body">
         ${et.tareas.map((t,ti)=>`
@@ -4722,6 +4733,25 @@ function renderTplEditor() {
         <button class="add-task-btn" onclick="agregarTareaTpl(${ei})">+ Agregar tarea</button>
       </div>
     </div>`).join('');
+}
+
+// ── Mover etapa arriba o abajo ──────────────────────────────────
+function moverEtapaTpl(ei, dir) {
+  const ni = ei + dir;
+  if (ni < 0 || ni >= _tplEtapas.length) return;
+  // Intercambiar posiciones
+  [_tplEtapas[ei], _tplEtapas[ni]] = [_tplEtapas[ni], _tplEtapas[ei]];
+  // Renumerar
+  _tplEtapas.forEach((et, i) => et.etapa = i + 1);
+  renderTplEditor();
+}
+
+// ── Insertar etapa nueva ANTES de la posición ei ────────────────
+function insertarEtapaAntes(ei) {
+  const nueva = { etapa: ei + 1, nombre: 'Nueva etapa', tareas: [] };
+  _tplEtapas.splice(ei, 0, nueva);
+  _tplEtapas.forEach((et, i) => et.etapa = i + 1);
+  renderTplEditor();
 }
 
 function actualizarNombreEtapa(ei, val) { _tplEtapas[ei].nombre = val; }

@@ -1367,8 +1367,24 @@ function initSB() {
 // INIT
 // ================================================================
 // ── CREDENCIALES SUPABASE (hardcoded) ──────────────────────────
+// — MODO DEV —
+const DEV_MODE = true; // cambiar a false en producción
+function hoyMX() {
+  const now = new Date();
+  const offset = -6 * 60;
+  const local = new Date(now.getTime() + (offset - now.getTimezoneOffset()) * 60000);
+  return local.toISOString().split('T')[0];
+}
 const SB_URL  = 'https://xmwtngobwcpfycgfcsvk.supabase.co';
 const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhtd3RuZ29id2NwZnljZ2Zjc3ZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNDE0MTgsImV4cCI6MjA5MDcxNzQxOH0.gTrLdIwX0jhqVhDCrK8-GO9aXNL5d6f4cZND_dPSjHQ';
+if (DEV_MODE) {
+  document.addEventListener('DOMContentLoaded', () => {
+    const banner = document.createElement('div');
+    banner.innerHTML = '⚠️ MODO DEV — Los datos SÍ van a Supabase producción';
+    banner.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#ef4444;color:#fff;text-align:center;padding:8px;font-weight:700;z-index:99999;font-size:13px';
+    document.body.appendChild(banner);
+  });
+}
 
 window.addEventListener('DOMContentLoaded', () => {
   // Inicializar Supabase directamente sin pantalla de configuracion
@@ -1446,7 +1462,7 @@ async function initApp() {
   // Set today's date as default in registration form
   const fFecha = document.getElementById('fFecha');
   if (fFecha) {
-    fFecha.value = new Date().toISOString().split('T')[0];
+    fFecha.value = hoyMX();
   }
   // Show vendedora field for admin
   const fVW = document.getElementById('fVendadoraWrap');
@@ -1577,7 +1593,7 @@ function toggleVenta(p) {
   if (sem==='VENTA') {
     sec.classList.add('on');
     const fi = document.getElementById(p==='f'?'fFechaVenta':'eFechaVenta');
-    if (!fi.value) fi.value = new Date().toISOString().split('T')[0];
+    if (!fi.value) fi.value = hoyMX();
   } else sec.classList.remove('on');
 }
 
@@ -1588,7 +1604,7 @@ async function registrarContacto() {
   btn.disabled=true; btn.textContent='Guardando...';
   const sem   = document.getElementById('fSemaforo').value;
   const esV   = sem === 'VENTA';
-  const fecha = document.getElementById('fFecha')?.value || new Date().toISOString().split('T')[0];
+  const fecha = document.getElementById('fFecha')?.value || hoyMX();
   const vendedoraOverride = SESSION.rol==='ADMIN' ? (document.getElementById('fVendedora')?.value||null) : null;
   try {
     const { data, error } = await SB.rpc('crear_contacto_con_tareas', {
@@ -1631,7 +1647,7 @@ function limpiarForm() {
   document.getElementById('ventaF').classList.remove('on');
   // Reset date to today
   const fd = document.getElementById('fFecha');
-  if (fd) fd.value = new Date().toISOString().split('T')[0];
+  if (fd) fd.value = hoyMX();
   const ftc = document.getElementById('fTipoCliente'); if(ftc) ftc.value='';
   setOrigen('pauta');
   _ignorarDup = false;
@@ -1657,7 +1673,7 @@ function setMisFiltro(filtro, btn) {
 }
 
 async function cargarConteosTareas() {
-  const hoy  = new Date().toISOString().split('T')[0];
+  const hoy  = hoyMX();
   const lunes = new Date(); lunes.setDate(lunes.getDate() - lunes.getDay() + 1);
   const dom   = new Date(lunes); dom.setDate(lunes.getDate() + 6);
   const lunStr = lunes.toISOString().split('T')[0];
@@ -1691,7 +1707,7 @@ async function cargarMisRegistros(page=1) {
   const q   = document.getElementById('searchMis').value.trim();
   const sem = document.getElementById('filtMisSem').value;
   const from = (page-1)*PAGE_SIZE, to = from+PAGE_SIZE-1;
-  const hoyStr  = new Date().toISOString().split('T')[0];
+  const hoyStr  = hoyMX();
   const lunes   = new Date(); lunes.setDate(lunes.getDate() - lunes.getDay() + 1);
   const domSem  = new Date(lunes); domSem.setDate(lunes.getDate() + 6);
   const lunStr  = lunes.toISOString().split('T')[0];
@@ -1913,7 +1929,7 @@ async function abrirContacto(row) {
   document.getElementById('ventaE').classList.remove('on');
   if (row.semaforo==='VENTA') {
     document.getElementById('ventaE').classList.add('on');
-    document.getElementById('eFechaVenta').value = new Date().toISOString().split('T')[0];
+    document.getElementById('eFechaVenta').value = hoyMX();
   }
   const btnDel = document.getElementById('btnEliminar');
   if (btnDel) btnDel.style.display = SESSION.rol==='ADMIN'?'block':'none';
@@ -1986,7 +2002,7 @@ async function guardarEdicion() {
         const { count } = await SB.from('ventas').select('*',{count:'exact',head:true}).eq('contacto_id',editingId);
         await SB.from('ventas').insert({
           contacto_id: editingId, numero: updates.numero, vendedora: editVend,
-          fecha_venta: document.getElementById('eFechaVenta').value || new Date().toISOString().split('T')[0],
+          fecha_venta: document.getElementById('eFechaVenta').value || hoyMX(),
           monto, folio_nota: folio,
           compra_num: (count||0)+1,
         });
@@ -2352,7 +2368,7 @@ async function eliminarVenta(ventaId, numero) {
 function abrirNuevaVenta() {
   document.getElementById('nvSub').textContent = 'Cliente: '+(nvNombre||nvNumero);
   ['nvMonto','nvFolio','nvNotas'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
-  document.getElementById('nvFecha').value=new Date().toISOString().split('T')[0];
+  document.getElementById('nvFecha').value=hoyMX();
   document.getElementById('ventaModal').classList.add('open');
 }
 
@@ -2501,7 +2517,7 @@ function renderDash(d, desde, hasta, vend) {
     d.diasSemana = dowObj;
   }
   if (d.tendencia && Array.isArray(d.tendencia)) {
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoy = hoyMX();
     d.tendencia = d.tendencia.map(t => ({
       fecha: (t.fecha || t.dia || '').toString().substring(0,10),
       count: parseInt(t.count || t.cnt || 0),
@@ -3182,7 +3198,7 @@ async function cargarHoyCampana() {
   const el = document.getElementById('campanaHoyContent');
   if (!el) return;
   el.innerHTML = '<div class="loading"><div class="sp"></div></div>';
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = hoyMX();
   const {data} = await SB.from('campana_contactos')
     .select('*, contactos(id,numero,nombre,estado,semaforo,vendedora,fecha,etapa_actual)')
     .eq('campana_id', _campanaActiva.id)
@@ -3244,7 +3260,7 @@ async function cargarAgendaCampana() {
   const {data} = await SB.from('campana_contactos').select('fecha_activacion,estado')
     .eq('campana_id',_campanaActiva.id).order('fecha_activacion');
   if(!data) return;
-  const byDate={}, hoy=new Date().toISOString().split('T')[0];
+  const byDate={}, hoy=hoyMX();
   data.forEach(cc=>{
     if(!byDate[cc.fecha_activacion])byDate[cc.fecha_activacion]={total:0,completados:0};
     byDate[cc.fecha_activacion].total++;
@@ -4232,7 +4248,7 @@ async function cargarWAAnalytics() {
       vendedoras.map(v=>`<option value="${v.usuario}">${v.nombre||v.usuario}</option>`).join('');
   }
 
-  const desde   = document.getElementById('waDesde')?.value   || new Date().toISOString().split('T')[0];
+  const desde   = document.getElementById('waDesde')?.value   || hoyMX();
   const hasta   = document.getElementById('waHasta')?.value   || desde;
   const asesora = document.getElementById('waAsesora')?.value || null;
 

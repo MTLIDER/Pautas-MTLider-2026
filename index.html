@@ -1368,7 +1368,7 @@ function initSB() {
 // ================================================================
 // ── CREDENCIALES SUPABASE (hardcoded) ──────────────────────────
 // — MODO DEV —
-const DEV_MODE = true; // cambiar a false en producción
+const DEV_MODE = false; // cambiar a false en producción
 function hoyMX() {
   const now = new Date();
   const offset = -6 * 60;
@@ -1607,6 +1607,7 @@ async function registrarContacto() {
   const fecha = document.getElementById('fFecha')?.value || hoyMX();
   const vendedoraOverride = SESSION.rol==='ADMIN' ? (document.getElementById('fVendedora')?.value||null) : null;
   try {
+    const origenSel = document.getElementById('fOrigen')?.value || 'pauta';
     const { data, error } = await SB.rpc('crear_contacto_con_tareas', {
       p_vendedora: vendedoraOverride || SESSION.usuario,
       p_numero:   num,
@@ -1619,6 +1620,29 @@ async function registrarContacto() {
       p_fecha:    fecha
     });
     if (error) throw error;
+    // Asignar pipeline vinculado al origen automáticamente
+    if (data) {
+      const { data: tplData } = await SB.from('pipeline_templates')
+        .select('id').eq('origen_registro', origenSel).eq('activo', true).maybeSingle();
+      if (tplData?.id) {
+        // Obtener tareas del template vinculado
+        const { data: tareas } = await SB.from('template_tareas')
+          .select('*').eq('template_id', tplData.id).eq('activo', true).order('etapa').order('orden');
+        if (tareas?.length) {
+          // Borrar tareas default y asignar las del pipeline vinculado
+          await SB.from('etapas_checks').delete().eq('contacto_id', data);
+          const nuevasTareas = tareas.map(t => ({
+            contacto_id: data,
+            tarea: t.tarea,
+            etapa: t.etapa,
+            orden: t.orden,
+            template_id: tplData.id,
+            completado: false
+          }));
+          await SB.from('etapas_checks').insert(nuevasTareas);
+        }
+      }
+    }
     if (esV) {
       const monto = parseFloat(document.getElementById('fMonto')?.value)||0;
       const folio = document.getElementById('fFolio')?.value.trim()||null;
@@ -4659,7 +4683,7 @@ async function cargarPipelineTemplates() {
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div class="tpl-name" style="flex:1">${t.nombre}</div>
         <div style="display:flex;gap:4px;margin-left:6px" onclick="event.stopPropagation()">
-          <button title="Editar nombre" onclick="editarNombrePipeline(${t.id},'${t.nombre.replace(/'/g,"\\'")}','${(t.descripcion||'').replace(/'/g,"\\'")}','${t.tipo}')"
+          <button title="Editar nombre" onclick="editarNombrePipeline(${t.id})"
             style="border:none;background:none;cursor:pointer;font-size:14px;padding:2px 5px;color:var(--teal)">✏️</button>
           <button title="Eliminar pipeline" onclick="eliminarPipeline(${t.id},'${t.nombre.replace(/'/g,"\\'")}')"
             style="border:none;background:none;cursor:pointer;font-size:14px;padding:2px 5px;color:var(--red)">🗑️</button>
@@ -4667,6 +4691,7 @@ async function cargarPipelineTemplates() {
       </div>
       <div class="tpl-meta">${t.descripcion||''}</div>
       <div class="tpl-badge" style="background:${TIPO_COLOR[t.tipo]||'#f1f5f9'}">${TIPO_LABEL[t.tipo]||t.tipo}</div>
+      ${t.origen_registro ? `<div class="tpl-badge" style="background:#dcfce7;color:#16a34a;margin-top:4px">🔗 Auto: ${t.origen_registro}</div>` : '<div class="tpl-badge" style="background:#f1f5f9;color:#6b7280;margin-top:4px">📋 Solo campañas</div>'}
       <div class="tpl-meta" style="margin-top:6px">${(t.template_tareas||[]).length} tareas configuradas</div>
     </div>`).join('');
 }
@@ -4828,22 +4853,92 @@ async function guardarPipelineTareas() {
   cargarPipelineTemplates();
 }
 
-async function editarNombrePipeline(id, nombreActual, descActual, tipoActual) {
-  const nombre = prompt('Nombre del pipeline:', nombreActual);
-  if (!nombre?.trim() || nombre.trim() === nombreActual) return;
-  const desc = prompt('Descripcion:', descActual) ?? descActual;
-  const TIPOS = ['reactivacion','estandar','caliente','postventa'];
-  const tipoInput = prompt(`Tipo (${TIPOS.join(' / ')}):`, tipoActual) ?? tipoActual;
-  const tipo = TIPOS.includes(tipoInput.toLowerCase()) ? tipoInput.toLowerCase() : tipoActual;
+async function editarNombrePipeline(id) {
+  // Cargar datos actuales del pipeline
+  const {data: t, error: loadErr} = await SB.from('pipeline_templates')
+    .select('*').eq('id', id).single();
+  if (loadErr || !t) { toast('Error cargando pipeline','err'); return; }
+
+  // Crear modal de edición
+  const modal = document.createElement('div');
+  modal.id = 'modalEditPipeline';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:16px;padding:24px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+      <h3 style="margin:0 0 20px;font-size:16px;color:#1e2a3a">✏️ Editar Pipeline</h3>
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:700;color:#6b7280;display:block;margin-bottom:4px">NOMBRE</label>
+        <input id="ep_nombre" type="text" value="${(t.nombre||'').replace(/"/g,'&quot;')}" 
+          style="width:100%;border:1.5px solid #dde6f0;border-radius:8px;padding:8px 12px;font-size:14px;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:700;color:#6b7280;display:block;margin-bottom:4px">DESCRIPCIÓN</label>
+        <textarea id="ep_desc" rows="3"
+          style="width:100%;border:1.5px solid #dde6f0;border-radius:8px;padding:8px 12px;font-size:13px;box-sizing:border-box;resize:vertical">${t.descripcion||''}</textarea>
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:700;color:#6b7280;display:block;margin-bottom:6px">TIPO</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${['reactivacion','estandar','caliente','postventa'].map(tp=>`
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:13px">
+              <input type="radio" name="ep_tipo" value="${tp}" ${t.tipo===tp?'checked':''}>
+              ${tp.charAt(0).toUpperCase()+tp.slice(1)}
+            </label>`).join('')}
+        </div>
+      </div>
+      <div style="margin-bottom:20px">
+        <label style="font-size:12px;font-weight:700;color:#6b7280;display:block;margin-bottom:6px">ORIGEN VINCULADO AL REGISTRO</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          ${[
+            {val:'pauta',label:'📣 Pauta / Anuncio',desc:'Se asigna al registrar con origen Pauta'},
+            {val:'prospeccion',label:'🔍 Prospección',desc:'Se asigna con origen Prospección'},
+            {val:'reactivacion',label:'🔄 Reactivación',desc:'Se asigna con origen Reactivación'},
+            {val:'ninguno',label:'📋 Sin origen',desc:'Libre — solo para campañas'},
+          ].map(o=>`
+            <label style="border:2px solid ${(!t.origen_registro&&o.val==='ninguno')||t.origen_registro===o.val?'#00a0e9':'#dde6f0'};border-radius:10px;padding:8px 10px;cursor:pointer;display:flex;flex-direction:column;gap:2px" 
+              id="ep_lbl_${o.val}" onclick="epSelOrigen('${o.val}')">
+              <input type="radio" name="ep_origen" value="${o.val}" ${(!t.origen_registro&&o.val==='ninguno')||t.origen_registro===o.val?'checked':''} style="display:none">
+              <span style="font-size:13px;font-weight:700">${o.label}</span>
+              <span style="font-size:11px;color:#6b7280">${o.desc}</span>
+            </label>`).join('')}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="this.closest('[style*=fixed]').remove()" 
+          style="border:1.5px solid #dde6f0;background:#fff;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:14px">Cancelar</button>
+        <button onclick="guardarEdicionPipeline(${id})"
+          style="background:#00a0e9;color:#fff;border:none;border-radius:8px;padding:8px 20px;cursor:pointer;font-size:14px;font-weight:700">Guardar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+  document.getElementById('ep_nombre')?.focus();
+}
+
+function epSelOrigen(val) {
+  ['pauta','prospeccion','reactivacion','ninguno'].forEach(v => {
+    const lbl = document.getElementById('ep_lbl_'+v);
+    if(lbl) lbl.style.borderColor = v===val ? '#00a0e9' : '#dde6f0';
+  });
+  document.querySelector(`input[name="ep_origen"][value="${val}"]`).checked = true;
+}
+
+async function guardarEdicionPipeline(id) {
+  const nombre = document.getElementById('ep_nombre')?.value.trim();
+  if (!nombre) { toast('El nombre es requerido','err'); return; }
+  const desc = document.getElementById('ep_desc')?.value.trim() || '';
+  const tipo = document.querySelector('input[name="ep_tipo"]:checked')?.value || 'estandar';
+  const origenVal = document.querySelector('input[name="ep_origen"]:checked')?.value || 'ninguno';
   const {error} = await SB.from('pipeline_templates').update({
-    nombre: nombre.trim(), descripcion: desc.trim(), tipo
+    nombre, descripcion: desc, tipo,
+    origen_registro: origenVal === 'ninguno' ? null : origenVal
   }).eq('id', id);
   if (error) { toast('Error: '+error.message,'err'); return; }
+  document.getElementById('modalEditPipeline')?.remove();
   toast('✅ Pipeline actualizado','ok');
-  // If this is the active one, update editor title
   if (_tplActivo?.id === id) {
-    document.getElementById('tplEditorTitle').textContent = `Editando: ${nombre.trim()}`;
-    _tplActivo.nombre = nombre.trim();
+    document.getElementById('tplEditorTitle').textContent = `Editando: ${nombre}`;
+    _tplActivo.nombre = nombre;
   }
   cargarPipelineTemplates();
 }
@@ -4870,8 +4965,12 @@ async function crearNuevoPipeline() {
   // Use MAX(id)+1 to avoid sequence issues
   const {data: maxData} = await SB.from('pipeline_templates').select('id').order('id',{ascending:false}).limit(1);
   const nextId = ((maxData?.[0]?.id) || 0) + 1;
+  const ORIGENES_NEW = ['pauta','prospeccion','reactivacion','ninguno'];
+  const origenNew = prompt(`Origen vinculado al registro de contacto (${ORIGENES_NEW.join(' / ')}):\n- pauta: se asigna automaticamente al registrar con origen Pauta\n- ninguno: libre para campanas`, 'ninguno') || 'ninguno';
+  const origenNewVal = ORIGENES_NEW.includes(origenNew.toLowerCase()) ? origenNew.toLowerCase() : 'ninguno';
   const {data, error} = await SB.from('pipeline_templates').insert({
-    id: nextId, nombre: nombre.trim(), descripcion: desc.trim(), tipo: tipoVal, color:'00a0e9', activo:true
+    id: nextId, nombre: nombre.trim(), descripcion: desc.trim(), tipo: tipoVal, color:'00a0e9', activo:true,
+    origen_registro: origenNewVal === 'ninguno' ? null : origenNewVal
   }).select().single();
   if (error) { toast('Error: '+error.message,'err'); return; }
   toast('✅ Pipeline "'+nombre.trim()+'" creado. Agrega etapas y tareas.','ok');

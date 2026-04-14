@@ -1747,7 +1747,7 @@ async function cargarMisRegistros(page=1) {
       .eq('completado', false)
       .eq('contactos.vendedora', SESSION.usuario);
     if (_misFiltro === 'hoy')        tQuery = tQuery.eq('fecha_programada', hoyStr);
-    if (_misFiltro === 'pendientes') tQuery = tQuery.lt('fecha_programada', hoyStr);
+    if (_misFiltro === 'pendientes') tQuery = tQuery.lte('fecha_programada', hoyStr);
     if (_misFiltro === 'semana')     tQuery = tQuery.gte('fecha_programada', lunStr).lte('fecha_programada', domStr);
     const {data: tData} = await tQuery;
     const idsChecks = new Set((tData||[]).map(t => t.contacto_id));

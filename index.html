@@ -1573,6 +1573,7 @@ function semBadge(s) {
   return `<span class="badge ${m[s]||''}">${s||''}</span>`;
 }
 function etapaBadge(e) {
+  if (e === null || e === undefined) return `<span class="etapa-badge" style="background:#f1f5f9;color:#6b7280;font-size:10px">Campaña</span>`;
   return `<span class="etapa-badge e${e}">E${e}</span>`;
 }
 function heatColor(v, max) {

@@ -2038,6 +2038,14 @@ async function guardarEdicion() {
     const folio = prev.folio || null;
     if (prev.semaforo && prev.semaforo !== sem) {
       await registrarBitacora(editingId, folio, 'semaforo', 'Cambio de semáforo', prev.semaforo, sem);
+      // Si se descarta el contacto, cancelar todas las tareas pendientes
+      if (sem === 'DESCARTADO') {
+        await SB.from('etapas_checks')
+          .update({ fecha_programada: null })
+          .eq('contacto_id', editingId)
+          .eq('completado', false);
+        toast('🚫 Contacto descartado — tareas canceladas', 'info');
+      }
     }
     if (adminVend && adminVend !== prev.vendedora) {
       await registrarBitacora(editingId, folio, 'reasignacion', `Reasignado: ${prev.vendedora} → ${adminVend}`, prev.vendedora, adminVend);
@@ -2160,16 +2168,33 @@ async function cargarPipeline(contactoId, etapaActual) {
       </div>`);
   }
   // Show tasks for current stage by default
-  mostrarTareasData(byEtapa, etapaActual, checks, contactoId, null, etNombres, totalEtapas);
+  // Obtener fecha de registro del contacto
+  const { data: ctFecha } = await SB.from('contactos').select('fecha').eq('id', contactoId).single();
+  const registradoHoy = (ctFecha?.fecha || '') === hoyMX();
+
+  // Verificar si la ASESORA tiene tareas vencidas en cualquier otro contacto
+  // (solo si el contacto no fue registrado hoy)
+  let asesoraConVencidas = false;
+  if (!registradoHoy && SESSION?.usuario) {
+    const { data: venc } = await SB.from('etapas_checks')
+      .select('id, contactos!inner(vendedora)')
+      .eq('completado', false)
+      .eq('contactos.vendedora', SESSION.usuario)
+      .lt('fecha_programada', hoyMX())
+      .limit(1);
+    asesoraConVencidas = (venc && venc.length > 0);
+  }
+
+  mostrarTareasData(byEtapa, etapaActual, checks, contactoId, null, etNombres, totalEtapas, registradoHoy, asesoraConVencidas);
   // Render mini timeline
   renderTimeline(checks, stagesEl.parentElement);
-  window._pipelineData = {byEtapa, etapaActual, checks, contactoId, etNombres, totalEtapas};
+  window._pipelineData = {byEtapa, etapaActual, checks, contactoId, etNombres, totalEtapas, registradoHoy, asesoraConVencidas};
 }
 
 function mostrarTareas(etapa) {
   if (!window._pipelineData) return;
-  const {byEtapa, etapaActual, checks, contactoId, etNombres, totalEtapas} = window._pipelineData;
-  mostrarTareasData(byEtapa, etapaActual, checks, contactoId, etapa, etNombres, totalEtapas);
+  const {byEtapa, etapaActual, checks, contactoId, etNombres, totalEtapas, registradoHoy, asesoraConVencidas} = window._pipelineData;
+  mostrarTareasData(byEtapa, etapaActual, checks, contactoId, etapa, etNombres, totalEtapas, registradoHoy, asesoraConVencidas);
 }
 
 
@@ -2213,7 +2238,7 @@ async function abrirRecurso(tareaId, url, contactoId) {
   cargarPipeline(contactoId, ct?.etapa_actual || 1);
 }
 
-function mostrarTareasData(byEtapa, etapaActual, checks, contactoId, verEtapa=null, etNombres=null, totalEtapas=4) {
+function mostrarTareasData(byEtapa, etapaActual, checks, contactoId, verEtapa=null, etNombres=null, totalEtapas=4, registradoHoy=false, asesoraConVencidas=false) {
   const etapa = verEtapa || etapaActual;
   const tasks = byEtapa[etapa] || [];
   const isLocked = etapa > etapaActual;
@@ -2298,11 +2323,15 @@ function mostrarTareasData(byEtapa, etapaActual, checks, contactoId, verEtapa=nu
           <span style="font-size:9px">· disponible ${fmtFecha(t.fecha_programada)}</span>
         </div>` : '';
 
-    const canCheck = !isLocked && disponibleHoy;
+    const hayVencidas = vencidas.length > 0 || asesoraConVencidas;
+    const bloqPorVencidas = hayVencidas && urgencia === 'hoy' && !t.completado && !registradoHoy;
+    const canCheck = !isLocked && disponibleHoy && !bloqPorVencidas;
     return `
     <div class="task-item" style="border-left:3px solid ${borderColor};background:${bgColor};margin-bottom:7px;border-radius:9px;padding:10px 12px">
-      <div class="task-check ${t.completado?'done':''} ${isLocked||(!disponibleHoy&&!t.completado)?'locked':''}"
+      <div class="task-check ${t.completado?'done':''} ${isLocked||(!disponibleHoy&&!t.completado)||bloqPorVencidas?'locked':''}"
+        style="${bloqPorVencidas?'opacity:.45;cursor:not-allowed':''}"
         onclick="${isLocked?`toast('Completa la etapa anterior primero','err')`:
+          bloqPorVencidas?`toast('⚠️ Debes completar las tareas vencidas antes de continuar con las de hoy','err')`:
           !disponibleHoy&&!t.completado?`toast('Esta tarea aun no esta disponible','info')`:
           `toggleTarea('${t.id}',${t.completado},'${contactoId}')`}">
         ${t.completado?'✓':''}

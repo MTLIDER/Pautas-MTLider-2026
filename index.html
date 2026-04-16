@@ -1717,7 +1717,7 @@ async function cargarConteosTareas() {
     if (!f) return;
     const id = t.contacto_id;
     if (f === hoy)             { if(!seenHoy.has(id)) {seenHoy.add(id); cHoy++;} }
-    if (f < hoy)               { if(!seenPend.has(id)){seenPend.add(id);cPend++;} }
+    if (f <= hoy)              { if(!seenPend.has(id)){seenPend.add(id);cPend++;} }
     if (f >= lunStr && f <= domStr) { if(!seenSem.has(id)){seenSem.add(id);cSem++;} }
   });
   const el = id => document.getElementById(id);
@@ -2194,6 +2194,9 @@ async function toggleTarea(tareaId, completadoActual, contactoId) {
   // Recargar pipeline del contacto
   const { data: ct } = await SB.from('contactos').select('etapa_actual').eq('id', contactoId).single();
   cargarPipeline(contactoId, ct?.etapa_actual || 1);
+  // Recargar lista y conteos para que desaparezca si ya no tiene pendientes
+  await cargarConteosTareas();
+  if (typeof misPage !== 'undefined') cargarMisRegistros(misPage);
 }
 
 // ── Abrir recurso de tarea ───────────────────────────────────────
